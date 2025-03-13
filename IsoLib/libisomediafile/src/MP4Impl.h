@@ -163,6 +163,11 @@ derivative works. Copyright (c) 1999.
   if(err) goto bail;                                                 \
   self->bytesRead += 4
 
+  #define GET32_V_NOMSG(varname)                              \
+  err = inputStream->read32(inputStream, (u32 *)&varname, 0); \
+  if(err) goto bail;                                          \
+  self->bytesRead += 4
+
 #define GET32_V_MSG(varname, msg)                               \
   err = inputStream->read32(inputStream, (u32 *)&varname, msg); \
   if(err) goto bail;                                            \
@@ -183,6 +188,11 @@ derivative works. Copyright (c) 1999.
   if(err) goto bail;                                                 \
   self->bytesRead += 2
 
+#define GET16_V_NOMSG(varname)                                \
+  err = inputStream->read16(inputStream, (u32 *)&varname, 0); \
+  if(err) goto bail;                                          \
+  self->bytesRead += 2
+
 #define GET16_V_MSG(varname, msg)                               \
   err = inputStream->read16(inputStream, (u32 *)&varname, msg); \
   if(err) goto bail;                                            \
@@ -201,6 +211,11 @@ derivative works. Copyright (c) 1999.
 #define GET8_V(varname)                                             \
   err = inputStream->read8(inputStream, (u32 *)&varname, #varname); \
   if(err) goto bail;                                                \
+  self->bytesRead += 1
+
+  #define GET8_V_NOMSG(varname)                              \
+  err = inputStream->read8(inputStream, (u32 *)&varname, 0); \
+  if(err) goto bail;                                         \
   self->bytesRead += 1
 
 #define GET8_V_MSG(varname, msg)                               \

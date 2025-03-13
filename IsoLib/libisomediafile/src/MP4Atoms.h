@@ -1120,23 +1120,32 @@ typedef struct ISOHEVCConfigAtom
   MP4_BASE_ATOM
   MP4Err (*addParameterSet)(struct ISOHEVCConfigAtom *self, MP4Handle ps, u32 where);
   MP4Err (*getParameterSet)(struct ISOHEVCConfigAtom *self, MP4Handle ps, u32 where, u32 index);
+  u32 configurationVersion;
+  u32 general_profile_space;
+  u32 general_tier_flag;
   u32 general_profile_idc;
   u32 general_profile_compatibility_flags;
+  u64 general_constraint_indicator_flags;
   u32 general_level_idc;
+  u32 min_spatial_segmentation_idc;
+  u32 parallelismType;
+  u32 chroma_format_idc;
+  u32 bit_depth_luma_minus8;
+  u32 bit_depth_chroma_minus8;
+  u32 avgFrameRate;
+  u32 constantFrameRate;
+  u32 numTemporalLayers;
+  u32 temporalIdNested;
   u32 lengthSizeMinusOne;
-  u32 complete_rep;
   u32 numOfArrays;
+  u32 complete_rep;
   struct
   {
     u32 array_completeness;
     u32 NALtype;
+    u32 numNalus;
     MP4LinkedList nalList;
   } arrays[8];
-  u32 chromaFormat;
-  u32 avgFrameRate;
-  u32 sps_temporal_id_nesting_flag;
-  u32 bitDepthLumaMinus8;
-  u32 bitDepthChromaMinus8;
 } ISOHEVCConfigAtom, *ISOHEVCConfigAtomPtr;
 
 typedef struct ISOVVCConfigAtom

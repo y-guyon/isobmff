@@ -1537,7 +1537,7 @@ ISONewHEVCSampleDescription(MP4Track theTrack, MP4Handle sampleDescriptionH, u32
   err = GetBytes(bb, 1, &x);
   if(err) goto bail;
   sps_max_sub_layers                   = ((x & 0xf) >> 1) + 1;
-  config->sps_temporal_id_nesting_flag = x & 1;
+  config->temporalIdNested = x & 1;
 
   /* profile_tier_level */
   /* general_profile_space (2) + general_tier_flag (1) + general_profile_idc (5) */
@@ -1607,7 +1607,7 @@ ISONewHEVCSampleDescription(MP4Track theTrack, MP4Handle sampleDescriptionH, u32
   /* chroma_format_idc */
   y = read_golomb_uev(bb, &err);
   if(err) goto bail;
-  config->chromaFormat = y;
+  config->chroma_format_idc = y;
   if(y == 3)
   {
     /* separate_colour_plane_flag */
@@ -1641,12 +1641,12 @@ ISONewHEVCSampleDescription(MP4Track theTrack, MP4Handle sampleDescriptionH, u32
   /* bit_depth_luma_minus8 */
   y = read_golomb_uev(bb, &err);
   if(err) goto bail;
-  config->bitDepthLumaMinus8 = y;
+  config->bit_depth_luma_minus8 = y;
 
   /* bit_depth_chroma_minus8 */
   y = read_golomb_uev(bb, &err);
   if(err) goto bail;
-  config->bitDepthChromaMinus8 = y;
+  config->bit_depth_chroma_minus8 = y;
 
   if(first_vps)
   {
