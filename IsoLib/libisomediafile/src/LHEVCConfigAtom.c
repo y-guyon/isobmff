@@ -27,9 +27,9 @@ static void destroy(MP4AtomPtr s)
 {
   MP4Err err;
   u32 i;
-  ISOHEVCConfigAtomPtr self;
+  ISOLHEVCConfigAtomPtr self;
   err  = MP4NoErr;
-  self = (ISOHEVCConfigAtomPtr)s;
+  self = (ISOLHEVCConfigAtomPtr)s;
   if(self == NULL) BAILWITHERROR(MP4BadParamErr)
   if(self->numOfArrays)
   {
@@ -52,7 +52,7 @@ static MP4Err serialize(struct MP4Atom *s, char *buffer)
 {
   MP4Err err;
   u32 x, i, array_index;
-  ISOHEVCConfigAtomPtr self = (ISOHEVCConfigAtomPtr)s;
+  ISOLHEVCConfigAtomPtr self = (ISOLHEVCConfigAtomPtr)s;
   err                       = MP4NoErr;
 
   err = MP4SerializeCommonBaseAtomFields((MP4AtomPtr)s, buffer);
@@ -63,42 +63,19 @@ static MP4Err serialize(struct MP4Atom *s, char *buffer)
   x = 1;
   PUT8_V(x);
 
-  /* general_profile_space(2) + general_tier_flag(1) + general_profile_idc(5) */
-  x = self->general_profile_idc;
-  PUT8_V(x);
-  PUT32(general_profile_compatibility_flags);
-  /* general_constraint_indicator_flags (48) */
-  x = 0;
-  PUT32_V(x);
-  PUT16_V(x);
-
-  PUT8(general_level_idc);
-
   /* reserved '1111'b + min_spatial_segmentation_idc (12) */
-  x = (0xf << 12);
+  x = (0xF << 12) | (self->min_spatial_segmentation_idc & 0x0FFF);
   PUT16_V(x);
 
   /* reserved '111111'b + parallelismType (2) */
-  x = (0x3f << 2);
+  x = (0x3f << 2) | (self->parallelismType & 0x3);
   PUT8_V(x);
 
-  /* reserved '111111'b + chromaFormat (2) */
-  x = (0x3f << 2) | self->chroma_format_idc;
-  PUT8_V(x);
-
-  /* reserved '11111'b + bitDepthLumaMinus8 (3) */
-  x = (0x1f << 3) | self->bit_depth_luma_minus8;
-  PUT8_V(x);
-
-  /* reserved '11111'b + bitDepthChromaMinus8 (3) */
-  x = (0x1f << 3) | self->bit_depth_chroma_minus8;
-  PUT8_V(x);
-
-  /* avgFrameRate */
-  PUT16(avgFrameRate);
-
-  /* constantFrameRate(2) + numTemporalLayers(3) + temporalIdNested(1) + lengthSizeMinusOne(2) */
-  x = (1 << 3) | (self->temporalIdNested << 2) | (self->lengthSizeMinusOne & 3);
+  /* reserved(2) + numTemporalLayers(3) + temporalIdNested(1) + lengthSizeMinusOne(2) */
+  x = (0x3 << 6) |
+    ((self->numTemporalLayers & 0x7) << 3) |
+    ((self->temporalIdNested & 0x1) << 2) |
+    (self->lengthSizeMinusOne & 0x3);
   PUT8_V(x);
 
   PUT8(numOfArrays);
@@ -136,13 +113,13 @@ bail:
 static MP4Err calculateSize(struct MP4Atom *s)
 {
   MP4Err err;
-  ISOHEVCConfigAtomPtr self = (ISOHEVCConfigAtomPtr)s;
+  ISOLHEVCConfigAtomPtr self = (ISOLHEVCConfigAtomPtr)s;
   u32 i, ii;
   err = MP4NoErr;
 
   err = MP4CalculateBaseAtomFieldSize((MP4AtomPtr)s);
   if(err) goto bail;
-  self->size += 23;
+  self->size += 6;
 
   if(self->numOfArrays)
   {
@@ -169,14 +146,13 @@ static MP4Err calculateSize(struct MP4Atom *s)
 
 bail:
   TEST_RETURN(err);
-
   return err;
 }
 
 static MP4Err createFromInputStream(MP4AtomPtr s, MP4AtomPtr proto, MP4InputStreamPtr inputStream)
 {
   MP4Err err;
-  ISOHEVCConfigAtomPtr self = (ISOHEVCConfigAtomPtr)s;
+  ISOLHEVCConfigAtomPtr self = (ISOLHEVCConfigAtomPtr)s;
   u32 x, i, array_index;
   char debug_buffer[70];
 
@@ -187,37 +163,6 @@ static MP4Err createFromInputStream(MP4AtomPtr s, MP4AtomPtr proto, MP4InputStre
 
   GET8(configurationVersion);
   if(self->configurationVersion != 1) BAILWITHERROR(MP4BadDataErr);
-
-  /* general_profile_space(2) + general_tier_flag(1) + general_profile_idc(5) */
-  GET8_V_NOMSG(x);
-  self->general_profile_space = (x & 0xC0) >> 6;
-  self->general_tier_flag = (x & 0x20) >> 5;
-  self->general_profile_idc = x & 0x1f;
-  snprintf(debug_buffer, sizeof(debug_buffer), "general_profile_space = %d", self->general_profile_space);
-  DEBUG_MSG(debug_buffer);
-  snprintf(debug_buffer, sizeof(debug_buffer), "general_tier_flag = %d", self->general_tier_flag);
-  DEBUG_MSG(debug_buffer);
-  snprintf(debug_buffer, sizeof(debug_buffer), "general_profile_idc = %d", self->general_profile_idc);
-  DEBUG_MSG(debug_buffer);
-
-  GET32_V_NOMSG(x);
-  self->general_profile_compatibility_flags = x;
-  snprintf(debug_buffer, sizeof(debug_buffer), "general_profile_compatibility_flags = 0x%08X", self->general_profile_compatibility_flags);
-  DEBUG_MSG(debug_buffer);
-
-  /* general_constraint_indicator_flags (48) */
-  GET32_V_NOMSG(x);
-  self->general_constraint_indicator_flags = (uint64_t)x << 16;  /* MSB (upper 32 bits) */
-  GET16_V_NOMSG(x);
-  self->general_constraint_indicator_flags |= x;  /* LSB (lower 16 bits) */
-  snprintf(debug_buffer, sizeof(debug_buffer), "general_constraint_indicator_flags = 0x%012llX", self->general_constraint_indicator_flags);
-  DEBUG_MSG(debug_buffer);
-
-  /* general_level_idc (8) */
-  GET8_V_NOMSG(x);
-  self->general_level_idc = x;
-  snprintf(debug_buffer, sizeof(debug_buffer), "general_level_idc = %d (Level %.1f)", self->general_level_idc, self->general_level_idc / 30.0);
-  DEBUG_MSG(debug_buffer);
 
   /* reserved '1111'b + min_spatial_segmentation_idc (12) */
   GET16_V_NOMSG(x);
@@ -231,35 +176,11 @@ static MP4Err createFromInputStream(MP4AtomPtr s, MP4AtomPtr proto, MP4InputStre
   snprintf(debug_buffer, sizeof(debug_buffer), "parallelismType = %d", self->parallelismType);
   DEBUG_MSG(debug_buffer);
 
-  /* reserved '111111'b + chromaFormat (2) */
+  /* reserved (2) + numTemporalLayers (3) + temporalIdNested (1) + lengthSizeMinusOne (2) */
   GET8_V_NOMSG(x);
-  self->chroma_format_idc = x & 0x3;
-  snprintf(debug_buffer, sizeof(debug_buffer), "chroma_format_idc = %d", self->chroma_format_idc);
-  DEBUG_MSG(debug_buffer);
-
-  /* reserved '11111'b + bitDepthLumaMinus8 (3) */
-  GET8_V_NOMSG(x);
-  self->bit_depth_luma_minus8 = x & 0x7;
-  snprintf(debug_buffer, sizeof(debug_buffer), "bit_depth_luma_minus8 = %d (%d bits)", self->bit_depth_luma_minus8, self->bit_depth_luma_minus8 + 8);
-  DEBUG_MSG(debug_buffer);
-
-  /* reserved '11111'b + bitDepthChromaMinus8 (3) */
-  GET8_V_NOMSG(x);
-  self->bit_depth_chroma_minus8 = x & 0x7;
-  snprintf(debug_buffer, sizeof(debug_buffer), "bit_depth_chroma_minus8 = %d (%d bits)", self->bit_depth_chroma_minus8, self->bit_depth_chroma_minus8 + 8);
-  DEBUG_MSG(debug_buffer);
-
-  /* avgFrameRate */
-  GET16(avgFrameRate);
-
-  /* constantFrameRate (2) + numTemporalLayers (3) + temporalIdNested (1) + lengthSizeMinusOne (2) */
-  GET8_V_NOMSG(x);
-  self->constantFrameRate = (x >> 6) & 0x3;
   self->numTemporalLayers = (x >> 3) & 0x7;
   self->temporalIdNested = (x >> 2) & 1;
   self->lengthSizeMinusOne = x & 0x3;
-  snprintf(debug_buffer, sizeof(debug_buffer), "constantFrameRate = %d", self->constantFrameRate);
-  DEBUG_MSG(debug_buffer);
   snprintf(debug_buffer, sizeof(debug_buffer), "numTemporalLayers = %d", self->numTemporalLayers);
   DEBUG_MSG(debug_buffer);
   snprintf(debug_buffer, sizeof(debug_buffer), "temporalIdNested = %d", self->temporalIdNested);
@@ -304,7 +225,7 @@ bail:
   return err;
 }
 
-static MP4Err addParameterSet(struct ISOHEVCConfigAtom *self, MP4Handle ps, u32 nalu)
+static MP4Err addNALUnit(struct ISOLHEVCConfigAtom *self, MP4Handle ps, u32 nalu)
 {
   MP4Err err;
   MP4Handle b;
@@ -337,11 +258,10 @@ static MP4Err addParameterSet(struct ISOHEVCConfigAtom *self, MP4Handle ps, u32 
 
 bail:
   TEST_RETURN(err);
-
   return err;
 }
 
-static MP4Err getParameterSet(struct ISOHEVCConfigAtom *self, MP4Handle ps, u32 nalu, u32 index)
+static MP4Err getNALUnit(struct ISOLHEVCConfigAtom *self, MP4Handle ps, u32 nalu, u32 index)
 {
   MP4Err err;
   MP4Handle b = NULL;
@@ -368,45 +288,33 @@ static MP4Err getParameterSet(struct ISOHEVCConfigAtom *self, MP4Handle ps, u32 
 
 bail:
   TEST_RETURN(err);
-
   return err;
 }
 
-MP4Err MP4CreateHEVCConfigAtom(ISOHEVCConfigAtomPtr *outAtom)
+MP4Err MP4CreateLHEVCConfigAtom(ISOLHEVCConfigAtomPtr *outAtom)
 {
   MP4Err err;
-  ISOHEVCConfigAtomPtr self;
+  ISOLHEVCConfigAtomPtr self;
   u32 i;
 
-  self = (ISOHEVCConfigAtomPtr)calloc(1, sizeof(ISOHEVCConfigAtom));
+  self = (ISOLHEVCConfigAtomPtr)calloc(1, sizeof(ISOLHEVCConfigAtom));
   TESTMALLOC(self);
 
   err = MP4CreateBaseAtom((MP4AtomPtr)self);
   if(err) goto bail;
-  self->type                  = ISOHEVCConfigAtomType;
-  self->name                  = "HEVCConfig";
+  self->type                  = ISOLHEVCConfigAtomType;
+  self->name                  = "LHEVCConfig";
   self->createFromInputStream = (cisfunc)createFromInputStream;
   self->destroy               = destroy;
   self->calculateSize         = calculateSize;
   self->serialize             = serialize;
   self->complete_rep          = 1;
-  self->addParameterSet       = addParameterSet;
-  self->getParameterSet       = getParameterSet;
+  self->addNALUnit            = addNALUnit;
+  self->getNALUnit            = getNALUnit;
 
   self->configurationVersion = 0;
-  self->general_profile_space = 0;
-  self->general_tier_flag = 0;
-  self->general_profile_idc = 0;
-  self->general_profile_compatibility_flags = 0;
-  self->general_constraint_indicator_flags = 0;
-  self->general_level_idc = 0;
   self->min_spatial_segmentation_idc = 0;
   self->parallelismType = 0;
-  self->chroma_format_idc = 0;
-  self->bit_depth_luma_minus8 = 0;
-  self->bit_depth_chroma_minus8 = 0;
-  self->avgFrameRate = 0;
-  self->constantFrameRate = 0;
   self->numTemporalLayers = 0;
   self->temporalIdNested = 0;
   self->lengthSizeMinusOne = 0;
@@ -423,6 +331,5 @@ MP4Err MP4CreateHEVCConfigAtom(ISOHEVCConfigAtomPtr *outAtom)
   *outAtom = self;
 bail:
   TEST_RETURN(err);
-
   return err;
 }

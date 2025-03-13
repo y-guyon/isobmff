@@ -129,6 +129,7 @@ enum
   ISOItemReferenceAtomType                     = MP4_FOUR_CHAR_CODE('i', 'r', 'e', 'f'),
   ISOVCConfigAtomType                          = MP4_FOUR_CHAR_CODE('a', 'v', 'c', 'C'),
   ISOHEVCConfigAtomType                        = MP4_FOUR_CHAR_CODE('h', 'v', 'c', 'C'),
+  ISOLHEVCConfigAtomType                       = MP4_FOUR_CHAR_CODE('l', 'h', 'v', 'C'),
   ISOVVCConfigAtomType                         = MP4_FOUR_CHAR_CODE('v', 'v', 'c', 'C'),
   ISOVVCNALUConfigAtomType                     = MP4_FOUR_CHAR_CODE('v', 'v', 'n', 'C'),
   ISOAVCSampleEntryAtomType                    = MP4_FOUR_CHAR_CODE('a', 'v', 'c', '1'),
@@ -1142,11 +1143,33 @@ typedef struct ISOHEVCConfigAtom
   struct
   {
     u32 array_completeness;
-    u32 NALtype;
+    u32 NAL_unit_type;
     u32 numNalus;
     MP4LinkedList nalList;
   } arrays[8];
 } ISOHEVCConfigAtom, *ISOHEVCConfigAtomPtr;
+
+typedef struct ISOLHEVCConfigAtom
+{
+  MP4_BASE_ATOM
+  MP4Err (*addNALUnit)(struct ISOLHEVCConfigAtom *self, MP4Handle ps, u32 where);
+  MP4Err (*getNALUnit)(struct ISOLHEVCConfigAtom *self, MP4Handle ps, u32 where, u32 index);
+  u32 configurationVersion;
+  u32 min_spatial_segmentation_idc;
+  u32 parallelismType;
+  u32 numTemporalLayers;
+  u32 temporalIdNested;
+  u32 lengthSizeMinusOne;
+  u32 numOfArrays;
+  u32 complete_rep;
+  struct
+  {
+    u32 array_completeness;
+    u32 NAL_unit_type;
+    u32 numNalus;
+    MP4LinkedList nalList;
+  } arrays[8];
+} ISOLHEVCConfigAtom, *ISOLHEVCConfigAtomPtr;
 
 typedef struct ISOVVCConfigAtom
 {
@@ -2336,6 +2359,7 @@ MP4Err MP4CreateItemPropertyContainerAtom(MP4ItemPropertyContainerAtomPtr *outAt
 MP4Err MP4CreateItemPropertyAssociationAtom(MP4ItemPropertyAssociationAtomPtr *outAtom);
 
 MP4Err MP4CreateHEVCConfigAtom(ISOHEVCConfigAtomPtr *outAtom);
+MP4Err MP4CreateLHEVCConfigAtom(ISOLHEVCConfigAtomPtr *outAtom);
 MP4Err MP4CreateVVCConfigAtom(ISOVVCConfigAtomPtr *outAtom);
 MP4Err MP4CreateVVCNALUConfigAtom(ISOVVCNALUConfigAtomPtr *outAtom);
 
