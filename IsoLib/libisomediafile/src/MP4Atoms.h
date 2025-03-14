@@ -859,14 +859,14 @@ typedef struct MP4VisualSampleEntryAtom
   /* u32			reserved3;         uint(32) = 0x01400f0 */
   u32 width;
   u32 height;
-  u32 reserved4; /* uint(32) = 0x0048000 */
-  u32 reserved5; /* uint(32) = 0x0048000 */
+  u32 horizresolution; /* uint(32) = 0x0048000 */
+  u32 vertresolution; /* uint(32) = 0x0048000 */
   u32 reserved6; /* uint(32) = 0 */
-  u32 reserved7; /* uint(16) = 1 */
+  u32 frame_count; /* uint(16) = 1 */
   u32 nameLength;
-  char name31[31];
-  u32 reserved8; /* uint(16) = 24 */
-  s32 reserved9; /* int(16) = -1 */
+  char compressorname31[31];
+  u32 depth; /* uint(16) = 24 */
+  s32 pre_defined2; /* int(16) = -1 */
 
 } MP4VisualSampleEntryAtom, *MP4VisualSampleEntryAtomPtr;
 

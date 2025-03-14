@@ -340,5 +340,5 @@ int main(int argc, char* argv[])
 
 	cleanParameters(&parameters);
 
-	return 1;
+	return 0;
 }
