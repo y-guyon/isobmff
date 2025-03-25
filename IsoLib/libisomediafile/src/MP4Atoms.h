@@ -1146,7 +1146,7 @@ typedef struct ISOHEVCConfigAtom
     u32 NAL_unit_type;
     u32 numNalus;
     MP4LinkedList nalList;
-  } arrays[8];
+  } arrays[9];
 } ISOHEVCConfigAtom, *ISOHEVCConfigAtomPtr;
 
 typedef struct ISOLHEVCConfigAtom
@@ -1168,7 +1168,7 @@ typedef struct ISOLHEVCConfigAtom
     u32 NAL_unit_type;
     u32 numNalus;
     MP4LinkedList nalList;
-  } arrays[8];
+  } arrays[9];
 } ISOLHEVCConfigAtom, *ISOLHEVCConfigAtomPtr;
 
 typedef struct ISOVVCConfigAtom

@@ -44,7 +44,6 @@ static void destroy(MP4AtomPtr s)
   if(self->super) self->super->destroy(s);
 bail:
   TEST_RETURN(err);
-
   return;
 }
 
@@ -129,7 +128,6 @@ static MP4Err serialize(struct MP4Atom *s, char *buffer)
   assert(self->bytesWritten == self->size);
 bail:
   TEST_RETURN(err);
-
   return err;
 }
 
@@ -169,7 +167,6 @@ static MP4Err calculateSize(struct MP4Atom *s)
 
 bail:
   TEST_RETURN(err);
-
   return err;
 }
 
@@ -300,7 +297,6 @@ static MP4Err createFromInputStream(MP4AtomPtr s, MP4AtomPtr proto, MP4InputStre
 
 bail:
   TEST_RETURN(err);
-
   return err;
 }
 
@@ -318,7 +314,7 @@ static MP4Err addParameterSet(struct ISOHEVCConfigAtom *self, MP4Handle ps, u32 
   if(err) goto bail;
   memcpy(*b, *ps, the_size);
 
-  for(i = 0; i < 8; i++)
+  for(i = 0; i <= 8; i++)
   {
     if(self->arrays[i].NAL_unit_type == nalu)
     {
@@ -337,7 +333,6 @@ static MP4Err addParameterSet(struct ISOHEVCConfigAtom *self, MP4Handle ps, u32 
 
 bail:
   TEST_RETURN(err);
-
   return err;
 }
 
@@ -368,7 +363,6 @@ static MP4Err getParameterSet(struct ISOHEVCConfigAtom *self, MP4Handle ps, u32 
 
 bail:
   TEST_RETURN(err);
-
   return err;
 }
 
@@ -412,7 +406,7 @@ MP4Err MP4CreateHEVCConfigAtom(ISOHEVCConfigAtomPtr *outAtom)
   self->lengthSizeMinusOne = 0;
   self->numOfArrays = 0;
 
-  for(i = 0; i < 8; i++)
+  for(i = 0; i <= 8; i++)
   {
     err = MP4MakeLinkedList(&self->arrays[i].nalList);
     if(err) goto bail;
@@ -423,6 +417,5 @@ MP4Err MP4CreateHEVCConfigAtom(ISOHEVCConfigAtomPtr *outAtom)
   *outAtom = self;
 bail:
   TEST_RETURN(err);
-
   return err;
 }
