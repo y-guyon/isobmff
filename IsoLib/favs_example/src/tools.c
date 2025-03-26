@@ -245,10 +245,16 @@ int parseInput(int argc, char* argv[], struct ParamStruct *parameters) {
 				break;
 				/* Long parameter name */
 			case '-': {
-#define LONG_PARAM_I(NAME, LEN, OUTPUT) if (strncmp(&argv[param][2], NAME, LEN) == 0) { \
-					if (argv[param][LEN+2] == '=') OUTPUT = atoi(&argv[param][LEN+3]); \
-							else { if (argc - 1 == param) break; param++; OUTPUT = atoi(argv[param + 1]); } \
-							}
+#define LONG_PARAM_I(NAME, LEN, OUTPUT) \
+				if (strncmp(&argv[param][2], NAME, LEN) == 0) { \
+					if (argv[param][LEN+2] == '=') { \
+						OUTPUT = atoi(&argv[param][LEN+3]); \
+					} else { \
+						if (argc - 1 <= param) break; \
+						param++; \
+						OUTPUT = atoi(argv[param]); \
+					} \
+				}
 #define LONG_PARAM_F(NAME, LEN, OUTPUT) if (strncmp(&argv[param][2], NAME, LEN) == 0) { \
 					if (argv[param][LEN+2] == '=') OUTPUT = atof(&argv[param][LEN+3]); \
 							else { if (argc - 1 == param) break; param++; OUTPUT = atof(argv[param + 1]); } \
@@ -278,7 +284,8 @@ int parseInput(int argc, char* argv[], struct ParamStruct *parameters) {
 					temp_string = NULL;
 				}
 				LONG_PARAM_S("output", 5, parameters->output);
-
+				
+				LONG_PARAM_I("mode", 4, parameters->hevcExtractionMode);
 			}
 				break;
 			}
