@@ -1,39 +1,35 @@
 # ISO Base Media File Format (ISOBMFF)
 
-This repository is the official repository for the ISO Base Media File Format Reference Software.
+This repository is the official reference implementation of the ISO Base Media File Format.
 
-The ISO base media file format is published by ISO as part 12 of the MPEG-4 specifications, ISO/IEC 14496-12.
-As such, it implements and conforms to part of MPEG-4.
+The ISO base media file format is published by ISO as part 12 of the MPEG-4 specifications, ISO/IEC 14496-12. As such, it implements and conforms to part of MPEG-4.
+
 This part of MPEG-4 is used heavily by standards other than MPEG-4, and this reference software is often used by the reference software for those other standards, but still provides, in those contexts, an implementation "claiming conformance to MPEG-4".
 
-Updates to the reference software can be submitted using Pull Requests but are subject to approval by MPEG, and a formal input contribution should be submitted to MPEG.
+> 📢 Pull Requests are welcome but must also be submitted as formal contributions to MPEG. Please separate changes to the build system and core features into separate pull requests when possible.
 
-When possible, it is preferred that separate Pull Requests for fixes/enhancements to the build system and for fixes/enhancements to the software features.
+### Documentation
 
-## Documentation
+- **API Reference**: [gh-pages](https://mpeggroup.github.io/isobmff)
+- **Usage Examples & Legacy API Docs**: See the [Wiki](https://github.com/MPEGGroup/isobmff/wiki)
 
-The general documentation of the public exported API is available at [gh-pages](https://mpeggroup.github.io/isobmff) and can also be generated locally with [Doxygen](https://www.doxygen.nl/index.html) by running:
+To build documentation locally with [Doxygen](https://www.doxygen.nl):
 
 ``` sh
 doxygen Doxyfile
 ```
 
-In addition, several **How to use** examples as well as the old version of the API (extracted from isofile.doc) are provided in the following [Wiki](https://github.com/MPEGGroup/isobmff/wiki).
-
 ## Development
 
-The repository contains the `libisomediafile` which is a library implementing the ISO base media file format.
-In addition, several tools to read and write files based on this specification are provided.
+This project uses [CMake](https://cmake.org/) to build the software. While the repository contains legacy project files for various IDEs (e.g., Visual Studio, Xcode), those are no longer maintained and are preserved only for compatibility with other MPEG-related tools.
 
-### Requirements
+This repository includes:
 
-- [CMake](https://cmake.org/)
-- [git](https://git-scm.com/)
+- `libisomediafile`: a core library implementing ISO Base Media File Format
+- Several command-line tools for reading, writing, or converting ISOBMFF-based files
 
-### Compiling
 
-It is recommended to use `cmake` to build the software in this repository.
-However, this repository also contains old project files for some IDE's which are no longer maintained and are kept in the repository just to maintain compatibility with other software from MPEG.
+### 🚀 Compiling
 
 Example of commands to build the entire toolset on a Linux platform.
 
@@ -45,21 +41,32 @@ cmake ..
 make
 ```
 
-#### Cross platform
+#### ⚙️ Optional CMake Configuration Flags
 
-CMake allows to generate build scripts for different platforms.
-For instance:
+| Option                            | Default | Description                                                                 |
+|-----------------------------------|---------|-----------------------------------------------------------------------------|
+| `LIBISOMEDIAFILE_STRICT_WARNINGS` | `ON`    | Treats all compiler warnings as errors. Set to `OFF` to disable.            |
+| `SET_CUSTOM_OUTPUT_DIRS`          | `ON`    | Places output binaries in `bin/` and libraries in `lib/`. Set to `OFF` to allow custom build layout. |
+
+Example:
+
+```sh
+cmake -DLIBISOMEDIAFILE_STRICT_WARNINGS=OFF -DSET_CUSTOM_OUTPUT_DIRS=OFF -DCMAKE_BUILD_TYPE=Debug ..
+```
+
+### Cross-Platform Support
+
+CMake supports multiple generators and toolchains:
 
 ``` sh
 cmake -G "Visual Studio 16 2019" -A ARM64
 ```
 
-For more generators, please see [CMake documentation](https://cmake.org/cmake/help/latest/manual/cmake-generators.7.html).
+For more options, refer to the [CMake generators documentation](https://cmake.org/cmake/help/latest/manual/cmake-generators.7.html).
 
-Note also that certain IDE may be able to natively parse a `CMakeLists.txt`
-in which case there is no need to generate specific build scripts. Please refer to your IDE's documentation on how to best handle CMake-based projects.
+> Many IDEs (e.g., Visual Studio, CLion) can open and parse CMakeLists.txt directly without manual configuration.
 
-#### Individual compilation
+### Building Individual Components
 
 If you are only interested in certain tools, you can build them individually.
 
@@ -95,3 +102,17 @@ The following are some of the valid targets for this Makefile:
 ... WAV_to_MP4
 ... MP4_to_WAV
 ```
+
+### Code Formatting (clang-format)
+
+We use clang-format to enforce consistent coding style in the libisomediafile library.
+
+To format all `.c` and `.h` files under IsoLib/libisomediafile, run:
+
+```sh
+find IsoLib/libisomediafile -name "*.h" -o -name "*.cpp" -o -name "*.c" | xargs clang-format -style=file -i
+```
+
+> 💡 Make sure clang-format is installed and available in your `PATH`.
+
+The formatting rules are defined in the project's [.clang-format](./.clang-format) file. Contributions to `libisomediafile` should follow this formatting style.
