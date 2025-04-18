@@ -20,9 +20,9 @@
 
 #include "MP4Atoms.h"
 #include "MP4Descriptors.h"
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <stdio.h>
 
 static void destroy(MP4AtomPtr s)
 {
