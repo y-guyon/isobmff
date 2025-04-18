@@ -107,7 +107,8 @@ static MP4Err serialize(struct MP4Atom *s, char *buffer)
     u32 count;
     err = MP4GetListEntryCount(self->arrays[array_index].nalList, &count);
     if(err) goto bail;
-    x = (self->arrays[array_index].array_completeness << 7) | self->arrays[array_index].NAL_unit_type;
+    x =
+      (self->arrays[array_index].array_completeness << 7) | self->arrays[array_index].NAL_unit_type;
     PUT8_V(x);
 
     PUT16_V(count);
@@ -188,38 +189,44 @@ static MP4Err createFromInputStream(MP4AtomPtr s, MP4AtomPtr proto, MP4InputStre
   /* general_profile_space(2) + general_tier_flag(1) + general_profile_idc(5) */
   GET8_V_NOMSG(x);
   self->general_profile_space = (x & 0xC0) >> 6;
-  self->general_tier_flag = (x & 0x20) >> 5;
-  self->general_profile_idc = x & 0x1f;
-  snprintf(debug_buffer, sizeof(debug_buffer), "general_profile_space = %d", self->general_profile_space);
+  self->general_tier_flag     = (x & 0x20) >> 5;
+  self->general_profile_idc   = x & 0x1f;
+  snprintf(debug_buffer, sizeof(debug_buffer), "general_profile_space = %d",
+           self->general_profile_space);
   DEBUG_MSG(debug_buffer);
   snprintf(debug_buffer, sizeof(debug_buffer), "general_tier_flag = %d", self->general_tier_flag);
   DEBUG_MSG(debug_buffer);
-  snprintf(debug_buffer, sizeof(debug_buffer), "general_profile_idc = %d", self->general_profile_idc);
+  snprintf(debug_buffer, sizeof(debug_buffer), "general_profile_idc = %d",
+           self->general_profile_idc);
   DEBUG_MSG(debug_buffer);
 
   GET32_V_NOMSG(x);
   self->general_profile_compatibility_flags = x;
-  snprintf(debug_buffer, sizeof(debug_buffer), "general_profile_compatibility_flags = 0x%08X", self->general_profile_compatibility_flags);
+  snprintf(debug_buffer, sizeof(debug_buffer), "general_profile_compatibility_flags = 0x%08X",
+           self->general_profile_compatibility_flags);
   DEBUG_MSG(debug_buffer);
 
   /* general_constraint_indicator_flags (48) */
   GET32_V_NOMSG(x);
-  self->general_constraint_indicator_flags = (uint64_t)x << 16;  /* MSB (upper 32 bits) */
+  self->general_constraint_indicator_flags = (uint64_t)x << 16; /* MSB (upper 32 bits) */
   GET16_V_NOMSG(x);
-  self->general_constraint_indicator_flags |= x;  /* LSB (lower 16 bits) */
-  snprintf(debug_buffer, sizeof(debug_buffer), "general_constraint_indicator_flags = 0x%012llX", self->general_constraint_indicator_flags);
+  self->general_constraint_indicator_flags |= x; /* LSB (lower 16 bits) */
+  snprintf(debug_buffer, sizeof(debug_buffer), "general_constraint_indicator_flags = 0x%012llX",
+           self->general_constraint_indicator_flags);
   DEBUG_MSG(debug_buffer);
 
   /* general_level_idc (8) */
   GET8_V_NOMSG(x);
   self->general_level_idc = x;
-  snprintf(debug_buffer, sizeof(debug_buffer), "general_level_idc = %d (Level %.1f)", self->general_level_idc, self->general_level_idc / 30.0);
+  snprintf(debug_buffer, sizeof(debug_buffer), "general_level_idc = %d (Level %.1f)",
+           self->general_level_idc, self->general_level_idc / 30.0);
   DEBUG_MSG(debug_buffer);
 
   /* reserved '1111'b + min_spatial_segmentation_idc (12) */
   GET16_V_NOMSG(x);
   self->min_spatial_segmentation_idc = x & 0x0FFF;
-  snprintf(debug_buffer, sizeof(debug_buffer), "min_spatial_segmentation_idc = %d", self->min_spatial_segmentation_idc);
+  snprintf(debug_buffer, sizeof(debug_buffer), "min_spatial_segmentation_idc = %d",
+           self->min_spatial_segmentation_idc);
   DEBUG_MSG(debug_buffer);
 
   /* reserved '111111'b + parallelismType (2) */
@@ -237,23 +244,26 @@ static MP4Err createFromInputStream(MP4AtomPtr s, MP4AtomPtr proto, MP4InputStre
   /* reserved '11111'b + bitDepthLumaMinus8 (3) */
   GET8_V_NOMSG(x);
   self->bit_depth_luma_minus8 = x & 0x7;
-  snprintf(debug_buffer, sizeof(debug_buffer), "bit_depth_luma_minus8 = %d (%d bits)", self->bit_depth_luma_minus8, self->bit_depth_luma_minus8 + 8);
+  snprintf(debug_buffer, sizeof(debug_buffer), "bit_depth_luma_minus8 = %d (%d bits)",
+           self->bit_depth_luma_minus8, self->bit_depth_luma_minus8 + 8);
   DEBUG_MSG(debug_buffer);
 
   /* reserved '11111'b + bitDepthChromaMinus8 (3) */
   GET8_V_NOMSG(x);
   self->bit_depth_chroma_minus8 = x & 0x7;
-  snprintf(debug_buffer, sizeof(debug_buffer), "bit_depth_chroma_minus8 = %d (%d bits)", self->bit_depth_chroma_minus8, self->bit_depth_chroma_minus8 + 8);
+  snprintf(debug_buffer, sizeof(debug_buffer), "bit_depth_chroma_minus8 = %d (%d bits)",
+           self->bit_depth_chroma_minus8, self->bit_depth_chroma_minus8 + 8);
   DEBUG_MSG(debug_buffer);
 
   /* avgFrameRate */
   GET16(avgFrameRate);
 
-  /* constantFrameRate (2) + numTemporalLayers (3) + temporalIdNested (1) + lengthSizeMinusOne (2) */
+  /* constantFrameRate (2) + numTemporalLayers (3) + temporalIdNested (1) + lengthSizeMinusOne (2)
+   */
   GET8_V_NOMSG(x);
-  self->constantFrameRate = (x >> 6) & 0x3;
-  self->numTemporalLayers = (x >> 3) & 0x7;
-  self->temporalIdNested = (x >> 2) & 1;
+  self->constantFrameRate  = (x >> 6) & 0x3;
+  self->numTemporalLayers  = (x >> 3) & 0x7;
+  self->temporalIdNested   = (x >> 2) & 1;
   self->lengthSizeMinusOne = x & 0x3;
   snprintf(debug_buffer, sizeof(debug_buffer), "constantFrameRate = %d", self->constantFrameRate);
   DEBUG_MSG(debug_buffer);
@@ -261,7 +271,8 @@ static MP4Err createFromInputStream(MP4AtomPtr s, MP4AtomPtr proto, MP4InputStre
   DEBUG_MSG(debug_buffer);
   snprintf(debug_buffer, sizeof(debug_buffer), "temporalIdNested = %d", self->temporalIdNested);
   DEBUG_MSG(debug_buffer);
-  snprintf(debug_buffer, sizeof(debug_buffer), "lengthSizeMinusOne = %d (%d bytes)", self->lengthSizeMinusOne, self->lengthSizeMinusOne + 1);
+  snprintf(debug_buffer, sizeof(debug_buffer), "lengthSizeMinusOne = %d (%d bytes)",
+           self->lengthSizeMinusOne, self->lengthSizeMinusOne + 1);
   DEBUG_MSG(debug_buffer);
 
   GET8(numOfArrays);
@@ -272,9 +283,11 @@ static MP4Err createFromInputStream(MP4AtomPtr s, MP4AtomPtr proto, MP4InputStre
     self->arrays[array_index].NAL_unit_type      = x & 0x3f;
     snprintf(debug_buffer, sizeof(debug_buffer), "--- Array %d ---", array_index);
     DEBUG_MSG(debug_buffer);
-    snprintf(debug_buffer, sizeof(debug_buffer), "array_completeness = %d", self->arrays[array_index].array_completeness);
+    snprintf(debug_buffer, sizeof(debug_buffer), "array_completeness = %d",
+             self->arrays[array_index].array_completeness);
     DEBUG_MSG(debug_buffer);
-    snprintf(debug_buffer, sizeof(debug_buffer), "NAL_unit_type = %d", self->arrays[array_index].NAL_unit_type);
+    snprintf(debug_buffer, sizeof(debug_buffer), "NAL_unit_type = %d",
+             self->arrays[array_index].NAL_unit_type);
     DEBUG_MSG(debug_buffer);
     err = MP4MakeLinkedList(&self->arrays[array_index].nalList);
     if(err) goto bail;
@@ -387,24 +400,24 @@ MP4Err MP4CreateHEVCConfigAtom(ISOHEVCConfigAtomPtr *outAtom)
   self->addParameterSet       = addParameterSet;
   self->getParameterSet       = getParameterSet;
 
-  self->configurationVersion = 0;
-  self->general_profile_space = 0;
-  self->general_tier_flag = 0;
-  self->general_profile_idc = 0;
+  self->configurationVersion                = 0;
+  self->general_profile_space               = 0;
+  self->general_tier_flag                   = 0;
+  self->general_profile_idc                 = 0;
   self->general_profile_compatibility_flags = 0;
-  self->general_constraint_indicator_flags = 0;
-  self->general_level_idc = 0;
-  self->min_spatial_segmentation_idc = 0;
-  self->parallelismType = 0;
-  self->chroma_format_idc = 0;
-  self->bit_depth_luma_minus8 = 0;
-  self->bit_depth_chroma_minus8 = 0;
-  self->avgFrameRate = 0;
-  self->constantFrameRate = 0;
-  self->numTemporalLayers = 0;
-  self->temporalIdNested = 0;
-  self->lengthSizeMinusOne = 0;
-  self->numOfArrays = 0;
+  self->general_constraint_indicator_flags  = 0;
+  self->general_level_idc                   = 0;
+  self->min_spatial_segmentation_idc        = 0;
+  self->parallelismType                     = 0;
+  self->chroma_format_idc                   = 0;
+  self->bit_depth_luma_minus8               = 0;
+  self->bit_depth_chroma_minus8             = 0;
+  self->avgFrameRate                        = 0;
+  self->constantFrameRate                   = 0;
+  self->numTemporalLayers                   = 0;
+  self->temporalIdNested                    = 0;
+  self->lengthSizeMinusOne                  = 0;
+  self->numOfArrays                         = 0;
 
   for(i = 0; i <= 8; i++)
   {

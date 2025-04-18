@@ -860,12 +860,12 @@ typedef struct MP4VisualSampleEntryAtom
   u32 width;
   u32 height;
   u32 horizresolution; /* uint(32) = 0x0048000 */
-  u32 vertresolution; /* uint(32) = 0x0048000 */
-  u32 reserved6; /* uint(32) = 0 */
-  u32 frame_count; /* uint(16) = 1 */
+  u32 vertresolution;  /* uint(32) = 0x0048000 */
+  u32 reserved6;       /* uint(32) = 0 */
+  u32 frame_count;     /* uint(16) = 1 */
   u32 nameLength;
   char compressorname31[31];
-  u32 depth; /* uint(16) = 24 */
+  u32 depth;        /* uint(16) = 24 */
   s32 pre_defined2; /* int(16) = -1 */
 
 } MP4VisualSampleEntryAtom, *MP4VisualSampleEntryAtomPtr;

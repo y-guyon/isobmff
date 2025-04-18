@@ -1201,12 +1201,12 @@ bail:
 MP4_EXTERN(MP4Err)
 ISOGetHEVCNALUs(MP4Handle sampleEntryH, MP4Handle nalus, u32 extraction_mode)
 {
-  MP4Err err = MP4NoErr;
+  MP4Err err                        = MP4NoErr;
   MP4VisualSampleEntryAtomPtr entry = NULL;
-  ISOHEVCConfigAtomPtr hvcC = NULL;
-  ISOLHEVCConfigAtomPtr lhvC = NULL;
+  ISOHEVCConfigAtomPtr hvcC         = NULL;
+  ISOLHEVCConfigAtomPtr lhvC        = NULL;
 
-  static const u8 annexB_prefix[] = { 0x00, 0x00, 0x00, 0x01 };
+  static const u8 annexB_prefix[] = {0x00, 0x00, 0x00, 0x01};
 
   err = sampleEntryHToAtomPtr(sampleEntryH, (MP4AtomPtr *)&entry, MP4VisualSampleEntryAtomType);
   if(err) goto bail;
@@ -1219,31 +1219,31 @@ ISOGetHEVCNALUs(MP4Handle sampleEntryH, MP4Handle nalus, u32 extraction_mode)
 
   u32 i, j;
 
-  #define DUMP_NAL_UNITS(cfgAtom)                                                             \
-    for (i = 0; i <= 8; i++)                                                                    \
-    {                                                                                          \
-      if (cfgAtom->arrays[i].nalList)                                                          \
-      {                                                                                        \
-        u32 count = 0;                                                                         \
-        MP4GetListEntryCount(cfgAtom->arrays[i].nalList, &count);                              \
-        if (count == 0) continue;                                                              \
-        for (j = 0; j < count; j++)                                                            \
-        {                                                                                      \
-          MP4Handle oneNAL = NULL;                                                             \
-          u32 nalSize = 0;                                                                     \
-          MP4GetListEntry(cfgAtom->arrays[i].nalList, j, (char **)&oneNAL);                    \
-          MP4GetHandleSize(oneNAL, &nalSize);                                                  \
-          MP4Handle prefixH = NULL;                                                            \
-          MP4NewHandle(sizeof(annexB_prefix), &prefixH);                                       \
-          memcpy(*prefixH, annexB_prefix, sizeof(annexB_prefix));                              \
-          MP4HandleCat(nalus, prefixH);                                                        \
-          MP4HandleCat(nalus, oneNAL);                                                         \
-          MP4DisposeHandle(prefixH);                                                           \
-        }                                                                                      \
-      }                                                                                        \
-    }
-  
-  switch (extraction_mode)
+#define DUMP_NAL_UNITS(cfgAtom)                                           \
+  for(i = 0; i <= 8; i++)                                                 \
+  {                                                                       \
+    if(cfgAtom->arrays[i].nalList)                                        \
+    {                                                                     \
+      u32 count = 0;                                                      \
+      MP4GetListEntryCount(cfgAtom->arrays[i].nalList, &count);           \
+      if(count == 0) continue;                                            \
+      for(j = 0; j < count; j++)                                          \
+      {                                                                   \
+        MP4Handle oneNAL = NULL;                                          \
+        u32 nalSize      = 0;                                             \
+        MP4GetListEntry(cfgAtom->arrays[i].nalList, j, (char **)&oneNAL); \
+        MP4GetHandleSize(oneNAL, &nalSize);                               \
+        MP4Handle prefixH = NULL;                                         \
+        MP4NewHandle(sizeof(annexB_prefix), &prefixH);                    \
+        memcpy(*prefixH, annexB_prefix, sizeof(annexB_prefix));           \
+        MP4HandleCat(nalus, prefixH);                                     \
+        MP4HandleCat(nalus, oneNAL);                                      \
+        MP4DisposeHandle(prefixH);                                        \
+      }                                                                   \
+    }                                                                     \
+  }
+
+  switch(extraction_mode)
   {
   case 0: /* All */
     if(hvcC == NULL && lhvC == NULL) BAILWITHERROR(MP4BadDataErr);
@@ -1266,7 +1266,7 @@ ISOGetHEVCNALUs(MP4Handle sampleEntryH, MP4Handle nalus, u32 extraction_mode)
     break;
   }
 
-  #undef DUMP_NAL_UNITS
+#undef DUMP_NAL_UNITS
 bail:
   if(entry) entry->destroy((MP4AtomPtr)entry);
   return err;
@@ -1610,7 +1610,7 @@ ISONewHEVCSampleDescription(MP4Track theTrack, MP4Handle sampleDescriptionH, u32
    * (1) */
   err = GetBytes(bb, 1, &x);
   if(err) goto bail;
-  sps_max_sub_layers                   = ((x & 0xf) >> 1) + 1;
+  sps_max_sub_layers       = ((x & 0xf) >> 1) + 1;
   config->temporalIdNested = x & 1;
 
   /* profile_tier_level */

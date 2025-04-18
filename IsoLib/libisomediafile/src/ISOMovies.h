@@ -699,7 +699,7 @@ extern "C"
   /**
    * @brief Gets all NAL Units from the HEVC sample entry in Annex B format
    * @ingroup SampleDescr
-   * 
+   *
    * @param sampleEntryH input sample entry handle
    * @param nalus output handle which is holding all the NAL Units in Annex B fromat
    * @param extraction_mode if set to 0 - get them all; 1 - hvcC only; 2 - lhvC only
@@ -709,7 +709,7 @@ extern "C"
   /**
    * @brief Gets a restricted video parameter set (AVC or HEVC), placing it in the given handle
    * @ingroup SampleDescr
-   * 
+   *
    * @param sampleEntryH input sample entry handle
    * @param ps output handle which is holding the parameter set.
    * @param where can be AVCsps, AVCpps, AVCspsext, HEVCvps, HEVCsps or HEVCpps

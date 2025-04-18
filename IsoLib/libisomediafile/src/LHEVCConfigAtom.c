@@ -47,7 +47,7 @@ static MP4Err serialize(struct MP4Atom *s, char *buffer)
   MP4Err err;
   u32 x, i, array_index;
   ISOLHEVCConfigAtomPtr self = (ISOLHEVCConfigAtomPtr)s;
-  err                       = MP4NoErr;
+  err                        = MP4NoErr;
 
   err = MP4SerializeCommonBaseAtomFields((MP4AtomPtr)s, buffer);
   if(err) goto bail;
@@ -66,10 +66,8 @@ static MP4Err serialize(struct MP4Atom *s, char *buffer)
   PUT8_V(x);
 
   /* reserved(2) + numTemporalLayers(3) + temporalIdNested(1) + lengthSizeMinusOne(2) */
-  x = (0x3 << 6) |
-    ((self->numTemporalLayers & 0x7) << 3) |
-    ((self->temporalIdNested & 0x1) << 2) |
-    (self->lengthSizeMinusOne & 0x3);
+  x = (0x3 << 6) | ((self->numTemporalLayers & 0x7) << 3) | ((self->temporalIdNested & 0x1) << 2) |
+      (self->lengthSizeMinusOne & 0x3);
   PUT8_V(x);
 
   PUT8(numOfArrays);
@@ -79,7 +77,8 @@ static MP4Err serialize(struct MP4Atom *s, char *buffer)
     u32 count;
     err = MP4GetListEntryCount(self->arrays[array_index].nalList, &count);
     if(err) goto bail;
-    x = (self->arrays[array_index].array_completeness << 7) | self->arrays[array_index].NAL_unit_type;
+    x =
+      (self->arrays[array_index].array_completeness << 7) | self->arrays[array_index].NAL_unit_type;
     PUT8_V(x);
 
     PUT16_V(count);
@@ -161,7 +160,8 @@ static MP4Err createFromInputStream(MP4AtomPtr s, MP4AtomPtr proto, MP4InputStre
   /* reserved '1111'b + min_spatial_segmentation_idc (12) */
   GET16_V_NOMSG(x);
   self->min_spatial_segmentation_idc = x & 0x0FFF;
-  snprintf(debug_buffer, sizeof(debug_buffer), "min_spatial_segmentation_idc = %d", self->min_spatial_segmentation_idc);
+  snprintf(debug_buffer, sizeof(debug_buffer), "min_spatial_segmentation_idc = %d",
+           self->min_spatial_segmentation_idc);
   DEBUG_MSG(debug_buffer);
 
   /* reserved '111111'b + parallelismType (2) */
@@ -172,14 +172,15 @@ static MP4Err createFromInputStream(MP4AtomPtr s, MP4AtomPtr proto, MP4InputStre
 
   /* reserved (2) + numTemporalLayers (3) + temporalIdNested (1) + lengthSizeMinusOne (2) */
   GET8_V_NOMSG(x);
-  self->numTemporalLayers = (x >> 3) & 0x7;
-  self->temporalIdNested = (x >> 2) & 1;
+  self->numTemporalLayers  = (x >> 3) & 0x7;
+  self->temporalIdNested   = (x >> 2) & 1;
   self->lengthSizeMinusOne = x & 0x3;
   snprintf(debug_buffer, sizeof(debug_buffer), "numTemporalLayers = %d", self->numTemporalLayers);
   DEBUG_MSG(debug_buffer);
   snprintf(debug_buffer, sizeof(debug_buffer), "temporalIdNested = %d", self->temporalIdNested);
   DEBUG_MSG(debug_buffer);
-  snprintf(debug_buffer, sizeof(debug_buffer), "lengthSizeMinusOne = %d (%d bytes)", self->lengthSizeMinusOne, self->lengthSizeMinusOne + 1);
+  snprintf(debug_buffer, sizeof(debug_buffer), "lengthSizeMinusOne = %d (%d bytes)",
+           self->lengthSizeMinusOne, self->lengthSizeMinusOne + 1);
   DEBUG_MSG(debug_buffer);
 
   GET8(numOfArrays);
@@ -190,9 +191,11 @@ static MP4Err createFromInputStream(MP4AtomPtr s, MP4AtomPtr proto, MP4InputStre
     self->arrays[array_index].NAL_unit_type      = x & 0x3f;
     snprintf(debug_buffer, sizeof(debug_buffer), "--- Array %d ---", array_index);
     DEBUG_MSG(debug_buffer);
-    snprintf(debug_buffer, sizeof(debug_buffer), "array_completeness = %d", self->arrays[array_index].array_completeness);
+    snprintf(debug_buffer, sizeof(debug_buffer), "array_completeness = %d",
+             self->arrays[array_index].array_completeness);
     DEBUG_MSG(debug_buffer);
-    snprintf(debug_buffer, sizeof(debug_buffer), "NAL_unit_type = %d", self->arrays[array_index].NAL_unit_type);
+    snprintf(debug_buffer, sizeof(debug_buffer), "NAL_unit_type = %d",
+             self->arrays[array_index].NAL_unit_type);
     DEBUG_MSG(debug_buffer);
     err = MP4MakeLinkedList(&self->arrays[array_index].nalList);
     if(err) goto bail;
@@ -306,13 +309,13 @@ MP4Err MP4CreateLHEVCConfigAtom(ISOLHEVCConfigAtomPtr *outAtom)
   self->addNALUnit            = addNALUnit;
   self->getNALUnit            = getNALUnit;
 
-  self->configurationVersion = 0;
+  self->configurationVersion         = 0;
   self->min_spatial_segmentation_idc = 0;
-  self->parallelismType = 0;
-  self->numTemporalLayers = 0;
-  self->temporalIdNested = 0;
-  self->lengthSizeMinusOne = 0;
-  self->numOfArrays = 0;
+  self->parallelismType              = 0;
+  self->numTemporalLayers            = 0;
+  self->temporalIdNested             = 0;
+  self->lengthSizeMinusOne           = 0;
+  self->numOfArrays                  = 0;
 
   for(i = 0; i < 8; i++)
   {

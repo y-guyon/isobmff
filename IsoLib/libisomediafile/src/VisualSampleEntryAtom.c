@@ -136,13 +136,13 @@ MP4Err MP4CreateVisualSampleEntryAtom(MP4VisualSampleEntryAtomPtr *outAtom)
   self->calculateSize         = calculateSize;
   self->serialize             = serialize;
 
-  self->width     = 0x140;
-  self->height    = 0xf0;
+  self->width           = 0x140;
+  self->height          = 0xf0;
   self->horizresolution = 0x00480000;
-  self->vertresolution = 0x00480000;
-  self->frame_count = 1;
-  self->depth = 0x18;
-  self->pre_defined2 = -1;
+  self->vertresolution  = 0x00480000;
+  self->frame_count     = 1;
+  self->depth           = 0x18;
+  self->pre_defined2    = -1;
 
   *outAtom = self;
 bail:

@@ -163,7 +163,7 @@ derivative works. Copyright (c) 1999.
   if(err) goto bail;                                                 \
   self->bytesRead += 4
 
-  #define GET32_V_NOMSG(varname)                              \
+#define GET32_V_NOMSG(varname)                                \
   err = inputStream->read32(inputStream, (u32 *)&varname, 0); \
   if(err) goto bail;                                          \
   self->bytesRead += 4
@@ -213,7 +213,7 @@ derivative works. Copyright (c) 1999.
   if(err) goto bail;                                                \
   self->bytesRead += 1
 
-  #define GET8_V_NOMSG(varname)                              \
+#define GET8_V_NOMSG(varname)                                \
   err = inputStream->read8(inputStream, (u32 *)&varname, 0); \
   if(err) goto bail;                                         \
   self->bytesRead += 1
