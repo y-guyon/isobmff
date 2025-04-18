@@ -1,17 +1,17 @@
-#---------------------------------------------------------------------------------------------------
-# libisomediafile top-level list
-#---------------------------------------------------------------------------------------------------
 cmake_minimum_required (VERSION 3.9.2)
-#---------------------------------------------------------------------------------------------------
-project(libisomediafile)
-#---------------------------------------------------------------------------------------------------
 
-if (MSVC)
-    # warning level 4 and all warnings as errors
-    add_compile_options(/W4 /WX)
-else()
-    # lots of warnings and all warnings as errors
-    add_compile_options(-Wall -Wextra -pedantic -Werror)
+project(libisomediafile)
+
+option(LIBISOMEDIAFILE_STRICT_WARNINGS "Enable strict compiler warnings in libisomediafile" ON)
+
+if(LIBISOMEDIAFILE_STRICT_WARNINGS)
+    if (MSVC)
+        # warning level 4 and all warnings as errors
+        add_compile_options(/W4 /WX)
+    else()
+        # lots of warnings and all warnings as errors
+        add_compile_options(-Wall -Wextra -pedantic -Werror)
+    endif()
 endif()
 
 add_library(
@@ -249,8 +249,6 @@ add_library(
     ) # add_library
 
 
-#---------------------------------------------------------------------------------------------------
-
 target_include_directories(
     ${PROJECT_NAME}
 
@@ -269,22 +267,18 @@ target_include_directories(
 
     )
 
-#---------------------------------------------------------------------------------------------------
-
 target_compile_options(
     ${PROJECT_NAME}
 
     PRIVATE
 
     # GNU compiler
-    $<$<C_COMPILER_ID:GNU>:-Wall -W -std=c99 -pedantic -Wno-long-long -Wmissing-prototypes>
+    $<$<AND:$<BOOL:${LIBISOMEDIAFILE_STRICT_WARNINGS}>,$<C_COMPILER_ID:GNU>>:-Wall -W -std=c99 -pedantic -Wno-long-long -Wmissing-prototypes>
 
     # Visual Studio run time library
     $<$<AND:$<C_COMPILER_ID:MSVC>,$<CONFIG:Debug>>:/MTd>
     $<$<AND:$<C_COMPILER_ID:MSVC>,$<NOT:$<CONFIG:Debug>>>:/MT>
     )
-
-#---------------------------------------------------------------------------------------------------
 
 target_compile_definitions(
     ${PROJECT_NAME}
@@ -298,5 +292,3 @@ target_compile_definitions(
     $<$<PLATFORM_ID:Windows>:ISOMP4DLLAPI _CRT_SECURE_NO_WARNINGS>
 
     )
-
-#---------------------------------------------------------------------------------------------------
