@@ -277,7 +277,7 @@ target_compile_options(
     PRIVATE
 
     # GNU compiler
-    $<$<C_COMPILER_ID:GNU>:-Wall -W -ansi -pedantic -Wno-long-long -Wmissing-prototypes>
+    $<$<C_COMPILER_ID:GNU>:-Wall -W -std=c99 -pedantic -Wno-long-long -Wmissing-prototypes>
 
     # Visual Studio run time library
     $<$<AND:$<C_COMPILER_ID:MSVC>,$<CONFIG:Debug>>:/MTd>
