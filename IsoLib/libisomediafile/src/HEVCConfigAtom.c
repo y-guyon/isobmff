@@ -209,7 +209,7 @@ static MP4Err createFromInputStream(MP4AtomPtr s, MP4AtomPtr proto, MP4InputStre
 
   /* general_constraint_indicator_flags (48) */
   GET32_V_NOMSG(x);
-  self->general_constraint_indicator_flags = (uint64_t)x << 16; /* MSB (upper 32 bits) */
+  self->general_constraint_indicator_flags = (u64)x << 16; /* MSB (upper 32 bits) */
   GET16_V_NOMSG(x);
   self->general_constraint_indicator_flags |= x; /* LSB (lower 16 bits) */
   snprintf(debug_buffer, sizeof(debug_buffer), "general_constraint_indicator_flags = 0x%012llX",
