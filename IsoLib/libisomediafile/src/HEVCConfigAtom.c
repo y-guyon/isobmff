@@ -22,6 +22,7 @@
 #include "MP4Descriptors.h"
 #include <stdlib.h>
 #include <string.h>
+#include <stdio.h>
 
 static void destroy(MP4AtomPtr s)
 {
