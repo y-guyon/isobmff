@@ -764,6 +764,16 @@ extern "C"
    */
   MP4_EXTERN(MP4Err) MP4GetMovieIndTrackSampleEntryType(MP4Movie theMovie, u32 idx, u32 *SEType);
 
+  /**
+   * @brief Get number of bytes that is used to signal the length of a NAL unit.
+   *
+   * @note This function only returns the NALU length of the first sample entry.
+   * @param theMovie input movie object
+   * @param idx index of the track ranges between 1 and the number of tracks in theMovie.
+   * @param naluLength [out] number of bytes to signal NAL unit length.
+   */
+  MP4_EXTERN(MP4Err) MP4GetMovieIndTrackNALUnitLength(MP4Movie theMovie, u32 idx, u32 *naluLength);
+
   /*
   MP4_EXTERN ( MP4Err )
   MP4GetMovieInitialBIFSTrack( MP4Movie theMovie, MP4Track *outBIFSTrack );
