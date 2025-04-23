@@ -37,7 +37,7 @@
 
 extern "C"
 {
-MP4_EXTERN(MP4Err) ISOGetRESVOriginalFormat(MP4Handle sampleEntryH,
+MP4_EXTERN(MP4Err) ISOGetOriginalFormat(MP4Handle sampleEntryH,
                                             u32* outOrigFmt);
 MP4_EXTERN(MP4Err) ISOGetRESVSampleDescriptionPS(MP4Handle sampleEntryH,
                                                  MP4Handle ps,
@@ -175,7 +175,7 @@ std::string HEVCExtractorReader::getOriginalFormat(uint32_t uiTrackID) const
   if(MP4NoErr==err)
   {
     uint32_t uiOrigFormat = 0;
-    err = ISOGetRESVOriginalFormat(sampleEntryH, &uiOrigFormat);
+    err = ISOGetOriginalFormat(sampleEntryH, &uiOrigFormat);
     if(MP4NoErr==err)
     {
       if(uiOrigFormat==ISOHEVCSampleEntryAtomType) { strRet = "hvc1"; }

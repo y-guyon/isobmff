@@ -725,9 +725,8 @@ extern "C"
   /**
    * @brief Get the four character code of the original un-transformed sample entry
    * @ingroup SampleDescr
-   * @todo rename the function to ISOGetOriginalFormat and parse the cinf and sinf as well
    */
-  ISO_EXTERN(ISOErr) ISOGetRESVOriginalFormat(MP4Handle sampleEntryH, u32 *outOrigFmt);
+  ISO_EXTERN(ISOErr) ISOGetOriginalFormat(MP4Handle sampleEntryH, u32 *outOrigFmt);
   /**
    * @brief Get scheme_type and scheme_version from the SchemeTypeBox in resv
    * @ingroup SampleDescr
