@@ -1211,7 +1211,14 @@ ISOGetHEVCNALUs(MP4Handle sampleEntryH, MP4Handle nalus, u32 extraction_mode)
   err = sampleEntryHToAtomPtr(sampleEntryH, (MP4AtomPtr *)&entry, MP4VisualSampleEntryAtomType);
   if(err) goto bail;
 
-  if(entry->type != ISOHEVCSampleEntryAtomType && entry->type != ISOLHEVCSampleEntryAtomType)
+  if(entry->type == MP4EncVisualSampleEntryAtomType || entry->type == MP4RestrictedVideoSampleEntryAtomType)
+  {
+    u32 origFmt = 0;
+    err = ISOGetOriginalFormat(sampleEntryH, &origFmt);
+    if(origFmt != ISOHEVCSampleEntryAtomType && origFmt != ISOLHEVCSampleEntryAtomType)
+      BAILWITHERROR(MP4BadParamErr);
+  }
+  else if(entry->type != ISOHEVCSampleEntryAtomType && entry->type != ISOLHEVCSampleEntryAtomType)
     BAILWITHERROR(MP4BadParamErr);
 
   MP4GetListEntryAtom(entry->ExtensionAtomList, ISOHEVCConfigAtomType, (MP4AtomPtr *)&hvcC);
@@ -1465,33 +1472,47 @@ bail:
   return err;
 }
 
-MP4_EXTERN(MP4Err) ISOGetRESVOriginalFormat(MP4Handle sampleEntryH, u32 *outOrigFmt)
+MP4_EXTERN(MP4Err) ISOGetOriginalFormat(MP4Handle sampleEntryH, u32 *outOrigFmt)
 {
   MP4Err err = MP4NoErr;
-  MP4RestrictedVideoSampleEntryAtomPtr entry =
-    NULL; /* MP4RestrictedVideoSampleEntryAtomPtr | MP4VisualSampleEntryAtomPtr */
-  MP4RestrictedSchemeInfoAtomPtr rinf;
+  MP4AtomPtr entry = NULL;
   MP4OriginalFormatAtomPtr fmt;
 
-  err = sampleEntryHToAtomPtr(sampleEntryH, (MP4AtomPtr *)&entry, MP4VisualSampleEntryAtomType);
-  if(err) goto bail;
+  err = sampleEntryHToAtomPtr(sampleEntryH, &entry, MP4VisualSampleEntryAtomType);
+  if (err) goto bail;
 
-  if(entry->type != MP4RestrictedVideoSampleEntryAtomType) BAILWITHERROR(MP4BadParamErr);
-
-  err = entry->getRinf((MP4AtomPtr)entry, (MP4AtomPtr *)&rinf);
-  if(err) goto bail;
-  if(!rinf)
+  switch (entry->type)
   {
-    BAILWITHERROR(MP4BadParamErr);
+    case MP4RestrictedVideoSampleEntryAtomType:
+    {
+      MP4RestrictedSchemeInfoAtomPtr rinf = NULL;
+      MP4RestrictedVideoSampleEntryAtomPtr resv = (MP4RestrictedVideoSampleEntryAtomPtr)entry;
+
+      err = resv->getRinf((MP4AtomPtr)resv, (MP4AtomPtr *)&rinf);
+      if (err || !rinf) BAILWITHERROR(MP4BadParamErr);
+
+      fmt = (MP4OriginalFormatAtomPtr)rinf->MP4OriginalFormat;
+      break;
+    }
+
+    case MP4EncVisualSampleEntryAtomType:
+    {
+      MP4EncVisualSampleEntryAtomPtr encv = (MP4EncVisualSampleEntryAtomPtr)entry;
+      MP4SecurityInfoAtomPtr sinf = (MP4SecurityInfoAtomPtr)encv->SecurityInfo;
+
+      if (!sinf) BAILWITHERROR(MP4BadParamErr);
+      fmt = (MP4OriginalFormatAtomPtr)sinf->MP4OriginalFormat;
+      break;
+    }
+
+    default:
+      BAILWITHERROR(MP4BadParamErr);
   }
 
-  fmt = (MP4OriginalFormatAtomPtr)rinf->MP4OriginalFormat;
-  if(!fmt)
-  {
-    BAILWITHERROR(MP4BadParamErr);
-  }
+  if (!fmt) BAILWITHERROR(MP4BadParamErr);
 
   *outOrigFmt = fmt->original_format;
+  
 bail:
   if(entry) entry->destroy((MP4AtomPtr)entry);
   return err;
