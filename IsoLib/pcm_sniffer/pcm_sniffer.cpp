@@ -21,102 +21,154 @@
  *
  */
 
+// libisomediafile headers
 extern "C" {
   #include "MP4Movies.h"
   #include "MP4Atoms.h"
 }
 
+// HM headers
+#include "AnnexBread.h"   // InputByteStream, AnnexBStats, byteStreamNALUnit
+#include "NALread.h"      // InputNALUnit, read
+#include "TDecCAVLC.h"    // TDecCavlc
+#include "TComSlice.h"    // TComSPS, CHANNEL_TYPE_LUMA
+
+// C++ headers
 #include <iostream>
-#include <fstream>
+#include <sstream>
 #include <string>
+#include <vector>
+
+static void fourccToStr(u32 fcc, char out[5]) {
+  out[0] = char((fcc >> 24) & 0xFF);
+  out[1] = char((fcc >> 16) & 0xFF);
+  out[2] = char((fcc >>  8) & 0xFF);
+  out[3] = char((fcc      ) & 0xFF);
+  out[4] = 0;
+}
 
 class PcmSniffer {
 public:
-    int run(const std::string& fileName) {
-        ISOErr err;
-        ISOMovie moov = nullptr;
+  int run(const std::string& fileName) {
+    MP4Err err = MP4NoErr;
+    MP4Movie moov = nullptr;
 
-        // Open movie
-        err = ISOOpenMovieFile(&moov, fileName.c_str(), MP4OpenMovieNormal);
-        if (err) {
-            std::cerr << "Failed to open file: " << fileName << " (err=" << err << ")\n";
-            return err;
-        }
-
-        u32 trackCount = 0;
-        err = ISOGetMovieTrackCount(moov, &trackCount);
-        if (err) return err;
-
-        std::cout << "Movie has " << trackCount << " tracks\n";
-
-        for (u32 trackNumber = 1; trackNumber <= trackCount; ++trackNumber) {
-            ISOTrack trak = nullptr;
-            err = ISOGetMovieIndTrack(moov, trackNumber, &trak);
-            if (err) continue;
-
-            // Create track reader
-            ISOTrackReader reader = nullptr;
-            err = ISOCreateTrackReader(trak, &reader);
-            if (err) continue;
-
-            // Get sample entry
-            ISOHandle sampleEntryH;
-            ISONewHandle(0, &sampleEntryH);
-            err = MP4TrackReaderGetCurrentSampleDescription(reader, sampleEntryH);
-            if (err) { ISODisposeHandle(sampleEntryH); continue; }
-
-            u32 sampleEntryType = 0;
-            ISOGetSampleDescriptionType(sampleEntryH, &sampleEntryType);
-
-            char typeStr[5] = {0};
-            MP4TypeToString(sampleEntryType, typeStr);
-            std::cout << "Track " << trackNumber << " sample entry type: " << typeStr << "\n";
-
-            if (sampleEntryType == ISOHEVCSampleEntryAtomType) {
-                std::cout << " -> HEVC track, extracting parameter sets\n";
-
-                ISOHandle nalusH;
-                ISONewHandle(0, &nalusH);
-
-                // mode=0 → get VPS, SPS, PPS all together
-                err = ISOGetHEVCNALUs(sampleEntryH, nalusH, 0);
-                if (!err) {
-                    u32 size = 0;
-                    MP4GetHandleSize(nalusH, &size);
-                    std::cout << "Extracted " << size << " bytes of NALUs in AnnexB\n";
-
-                    if (size > 0) {
-                        // Dump to file
-                        std::string outName = "track_" + std::to_string(trackNumber) + "_ps.bin";
-                        std::ofstream out(outName, std::ios::binary);
-                        if (out) {
-                            out.write(*nalusH, size);
-                            std::cout << " -> Wrote parameter sets to " << outName << "\n";
-                        } else {
-                            std::cerr << " -> Failed to open " << outName << " for writing\n";
-                        }
-                    }
-                } else {
-                    std::cerr << "ISOGetHEVCNALUs failed with " << err << "\n";
-                }
-
-                ISODisposeHandle(nalusH);
-            }
-
-            ISODisposeHandle(sampleEntryH);
-            MP4DisposeTrackReader(reader);
-        }
-
-        ISODisposeMovie(moov);
-        return 0;
+    // Open MP4
+    err = MP4OpenMovieFile(&moov, fileName.c_str(), MP4OpenMovieNormal);
+    if (err) {
+      std::cerr << "Failed to open " << fileName << " (err=" << err << ")\n";
+      return err;
     }
+
+    u32 trackCount = 0;
+    if ((err = MP4GetMovieTrackCount(moov, &trackCount))) {
+      MP4DisposeMovie(moov);
+      return err;
+    }
+    std::cout << "Movie has " << trackCount << " tracks\n";
+
+    for (u32 trackNumber = 1; trackNumber <= trackCount; ++trackNumber) {
+      MP4Track trak = nullptr;
+      if (MP4GetMovieIndTrack(moov, trackNumber, &trak) != MP4NoErr || !trak) continue;
+
+      MP4TrackReader reader = nullptr;
+      if (MP4CreateTrackReader(trak, &reader) != MP4NoErr || !reader) continue;
+
+      MP4Handle sampleEntryH = nullptr;
+      MP4NewHandle(0, &sampleEntryH);
+      if (!sampleEntryH) { MP4DisposeTrackReader(reader); continue; }
+
+      err = MP4TrackReaderGetCurrentSampleDescription(reader, sampleEntryH);
+      if (err) {
+        MP4DisposeHandle(sampleEntryH);
+        MP4DisposeTrackReader(reader);
+        continue;
+      }
+
+      u32 sampleEntryType = 0;
+      ISOGetSampleDescriptionType(sampleEntryH, &sampleEntryType);
+      char typeStr[5]; fourccToStr(sampleEntryType, typeStr);
+      std::cout << "Track " << trackNumber << " sample entry: " << typeStr << "\n";
+
+      // TODO: sampleEntryType == MP4_FOUR_CHAR_CODE('e', 'n', 'c', 'v') 
+      if (sampleEntryType == ISOHEVCSampleEntryAtomType || sampleEntryType == MP4_FOUR_CHAR_CODE('h', 'e', 'v', '1')) {
+        std::cout << " -> HEVC track: extracting parameter sets\n";
+
+        MP4Handle nalusH = nullptr;
+        MP4NewHandle(0, &nalusH);
+        if (!nalusH) {
+          MP4DisposeHandle(sampleEntryH);
+          MP4DisposeTrackReader(reader);
+          continue;
+        }
+
+        // extraction_mode = 0 get NALUs from hvcC and from lhvC (if present)
+        err = ISOGetHEVCNALUs(sampleEntryH, nalusH, 0);
+        if (!err) {
+          u32 size = 0; MP4GetHandleSize(nalusH, &size);
+          std::cout << "Got " << size << " NALU bytes from sample entry\n";
+
+          if (size > 0) {
+            // HM wants a std::istream. Wrap into istringstream, then InputByteStream
+            std::string annexB(reinterpret_cast<char*>(*nalusH), size);
+            std::istringstream iss(annexB, std::ios::in | std::ios::binary);
+            InputByteStream ibs(iss);
+
+            AnnexBStats stats{};
+            TDecCavlc cavlc;
+
+            while (true) {
+              std::vector<uint8_t> nalUnit;
+              Bool eof = byteStreamNALUnit(ibs, nalUnit, stats);
+              if (nalUnit.empty() && eof) break;
+
+              // Load NAL bytes into InputNALUnit
+              InputNALUnit nalu;
+              {
+                auto& bs = nalu.getBitstream();  // reference to internal bitstream
+                bs.getFifo() = nalUnit;          // copy NAL payload bytes
+                bs.resetToStart();               // reset reader indices
+              }
+
+              // Parse NAL header. Sets nalu.m_nalUnitType and primes RBSP
+              read(nalu);
+
+              if (nalu.m_nalUnitType == NAL_UNIT_SPS) {
+                // Tell CAVLC where to read from, then parse SPS
+                cavlc.setBitstream(&nalu.getBitstream());
+                TComSPS sps;
+                cavlc.parseSPS(&sps);
+
+                std::cout << "  SPS id=" << sps.getSPSId()
+                          << " res=" << sps.getPicWidthInLumaSamples()
+                          << "x"     << sps.getPicHeightInLumaSamples()
+                          << " bitDepth=" << sps.getBitDepth(CHANNEL_TYPE_LUMA)
+                          << " pcm_enabled_flag=" << sps.getUsePCM()
+                          << "\n";
+              }
+            }
+          }
+        } else {
+          std::cerr << "ISOGetHEVCNALUs failed with " << err << "\n";
+        }
+
+        MP4DisposeHandle(nalusH);
+      }
+
+      MP4DisposeHandle(sampleEntryH);
+      MP4DisposeTrackReader(reader);
+    }
+
+    MP4DisposeMovie(moov);
+    return 0;
+  }
 };
 
 int main(int argc, char** argv) {
-    if (argc < 2) {
-        std::cerr << "Usage: pcm_sniffer <file.mp4>\n";
-        return 1;
-    }
-    PcmSniffer sniffer;
-    return sniffer.run(argv[1]);
+  if (argc < 2) {
+    std::cerr << "Usage: pcm_sniffer <file.mp4>\n";
+    return 1;
+  }
+  PcmSniffer sniffer;
+  return sniffer.run(argv[1]);
 }
