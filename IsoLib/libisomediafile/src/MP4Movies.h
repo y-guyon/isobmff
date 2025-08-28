@@ -1113,12 +1113,14 @@ extern "C"
    *
    * @param media input media object
    * @param itu_t_t35_data pre-serialized (big-endian) T.35 data that will go inside sgpd
-   * @param complete_message_flag If set to 1 indicates that the entire T.35 is stored in itu_t_t35_data
+   * @param complete_message_flag If set to 1 indicates that the entire T.35 is stored in
+   * itu_t_t35_data
    * @param index output index of the added group
    * @return MP4Err error code
    */
   MP4_EXTERN(MP4Err)
-  ISOAddT35GroupDescription(MP4Media media, MP4Handle itu_t_t35_data, u32 complete_message_flag, u32 *index);
+  ISOAddT35GroupDescription(MP4Media media, MP4Handle itu_t_t35_data, u32 complete_message_flag,
+                            u32 *index);
   /**
    * @brief Returns in the handle ‘description’ the group description associated with the given
    * group index of the given group type.
