@@ -88,12 +88,19 @@ public:
       u32 sampleEntryType = 0;
       ISOGetSampleDescriptionType(sampleEntryH, &sampleEntryType);
       char typeStr[5]; fourccToStr(sampleEntryType, typeStr);
-      std::cout << "Track " << trackNumber << " sample entry: " << typeStr << "\n";
+      std::cout << "Track " << trackNumber << " sample entry: " << typeStr;
 
-      // TODO: sampleEntryType == MP4_FOUR_CHAR_CODE('e', 'n', 'c', 'v') 
+      // If resv or encv, get the original format
+      if (sampleEntryType == MP4RestrictedVideoSampleEntryAtomType || sampleEntryType == MP4EncVisualSampleEntryAtomType) {
+        ISOGetOriginalFormat(sampleEntryH, &sampleEntryType);
+        fourccToStr(sampleEntryType, typeStr);
+        std::cout << ":" << typeStr << "\n";
+      }
+      else {
+        std::cout << "\n";
+      }
+
       if (sampleEntryType == ISOHEVCSampleEntryAtomType || sampleEntryType == MP4_FOUR_CHAR_CODE('h', 'e', 'v', '1')) {
-        std::cout << " -> HEVC track: extracting parameter sets\n";
-
         MP4Handle nalusH = nullptr;
         MP4NewHandle(0, &nalusH);
         if (!nalusH) {
@@ -102,11 +109,11 @@ public:
           continue;
         }
 
-        // extraction_mode = 0 get NALUs from hvcC and from lhvC (if present)
-        err = ISOGetHEVCNALUs(sampleEntryH, nalusH, 0);
+        // extraction_mode = 0 get NALUs from hvcC (HM may have issues with lhvC)
+        err = ISOGetHEVCNALUsFromSampleEntry(sampleEntryH, nalusH, 0);
         if (!err) {
           u32 size = 0; MP4GetHandleSize(nalusH, &size);
-          std::cout << "Got " << size << " NALU bytes from sample entry\n";
+          // std::cout << "Got " << size << " NALU bytes from sample entry\n";
 
           if (size > 0) {
             // HM wants a std::istream. Wrap into istringstream, then InputByteStream
@@ -149,7 +156,7 @@ public:
             }
           }
         } else {
-          std::cerr << "ISOGetHEVCNALUs failed with " << err << "\n";
+          std::cerr << "ISOGetHEVCNALUsFromSampleEntry failed with " << err << "\n";
         }
 
         MP4DisposeHandle(nalusH);

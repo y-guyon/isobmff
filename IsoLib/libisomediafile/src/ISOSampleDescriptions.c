@@ -1199,7 +1199,7 @@ bail:
 }
 
 MP4_EXTERN(MP4Err)
-ISOGetHEVCNALUs(MP4Handle sampleEntryH, MP4Handle nalus, u32 extraction_mode)
+ISOGetHEVCNALUsFromSampleEntry(MP4Handle sampleEntryH, MP4Handle nalus, u32 extraction_mode)
 {
   MP4Err err                        = MP4NoErr;
   MP4VisualSampleEntryAtomPtr entry = NULL;
