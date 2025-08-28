@@ -110,7 +110,7 @@ public:
         }
 
         // extraction_mode = 0 get NALUs from hvcC (HM may have issues with lhvC)
-        err = ISOGetHEVCNALUsFromSampleEntry(sampleEntryH, nalusH, 0);
+        err = ISOGetHEVCNALUsFromSampleEntry(sampleEntryH, nalusH, 1);
         if (!err) {
           u32 size = 0; MP4GetHandleSize(nalusH, &size);
           // std::cout << "Got " << size << " NALU bytes from sample entry\n";
