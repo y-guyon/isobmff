@@ -29,6 +29,8 @@
 #include <cstring>
 #include "test_data.h"
 
+#include <iostream>
+
 inline int parseVVCNal(FILE *input, u8 **data, int *data_len)
 {
   size_t startPos;
@@ -522,6 +524,13 @@ inline MP4Err addMebxSamples(MP4Media media, std::string strPattern, u32 repeatP
       appendDataWithBoxField(bufferData, lk_r, metaSampleRed);
       appendDataWithBoxField(bufferData, lk_w, metaSampleWhite);
       bufferSizes.push_back(sampleSize);
+      break;
+    }
+    case 'T':
+    {
+      std::vector<u8> metaSample = {0xDE, 0xAD, 0xBE, 0xEF};
+      appendDataWithBoxField(bufferData, lk_r, metaSample);
+      bufferSizes.push_back(metaSample.size() + 8);
       break;
     }
     default:
