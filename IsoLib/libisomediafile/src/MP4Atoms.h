@@ -170,8 +170,18 @@ enum
   MP4MetadataSetupBoxType                      = MP4_FOUR_CHAR_CODE('s', 'e', 't', 'u'),
   MP4GroupsListBoxType                         = MP4_FOUR_CHAR_CODE('g', 'r', 'p', 'l'),
   MP4AlternativeEntityGroup                    = MP4_FOUR_CHAR_CODE('a', 'l', 't', 'r'),
-  MP4T35SampleGroupEntry                       = MP4_FOUR_CHAR_CODE('i', 't', '3', '5')
+  MP4T35SampleGroupEntry                       = MP4_FOUR_CHAR_CODE('i', 't', '3', '5'),
+  MP4ColorInformationAtomType                  = MP4_FOUR_CHAR_CODE('c', 'o', 'l', 'r')
 
+};
+
+/* Colour Types */
+enum
+{
+  MP4ColorParameterTypeNCLX          = MP4_FOUR_CHAR_CODE('n', 'c', 'l', 'x'),
+  MP4ColorParameterTypeRICC          = MP4_FOUR_CHAR_CODE('r', 'I', 'C', 'C'),
+  MP4ColorParameterTypePROF          = MP4_FOUR_CHAR_CODE('p', 'r', 'o', 'f'),
+  QTColorParameterTypeNCLC           = MP4_FOUR_CHAR_CODE('n', 'c', 'l', 'c')
 };
 
 #ifdef ISMACrypt
@@ -2262,6 +2272,19 @@ typedef struct EntityToGroupBox
 
 } EntityToGroupBox, *EntityToGroupBoxPtr;
 
+typedef struct MP4ColorInformationAtom
+{
+  MP4_BASE_ATOM
+
+  u32 colour_type;
+  u32 colour_primaries;
+  u32 transfer_characteristics;
+  u32 matrix_coefficients;
+  u32 full_range_flag;
+  char *profile;
+  u32 profileSize;
+} MP4ColorInformationAtom, *MP4ColorInformationAtomPtr;
+
 MP4Err MP4CreateGroupListBox(GroupListBoxPtr *outAtom);
 MP4Err MP4CreateEntityToGroupBox(EntityToGroupBoxPtr *pOut, u32 type);
 MP4Err MP4GetListEntryAtom(MP4LinkedList list, u32 atomType, MP4AtomPtr *outItem);
@@ -2418,5 +2441,7 @@ MP4Err MP4CreateH263SpecificInfoAtom(MP4H263SpecificInfoAtomPtr *outAtom);
 MP4Err MP4CreateBitRateAtom(MP4BitRateAtomPtr *outAtom);
 
 MP4Err MP4CreateVisualMediaHeaderAtom(MP4VolumetricVisualMediaHeaderAtomPtr *outAtom);
+
+MP4Err MP4CreateColorInformationAtom(MP4ColorInformationAtomPtr *outAtom);
 
 #endif

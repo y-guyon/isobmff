@@ -103,6 +103,7 @@ add_library(
     src/MetaboxRelationAtom.c
     src/MJ2BitsPerComponentAtom.c
     src/MJ2ColorSpecificationAtom.c
+    src/MP4ColourInformationAtom.c
     src/MJ2FileTypeAtom.c
     src/MJ2HeaderAtom.c
     src/MJ2ImageHeaderAtom.c
