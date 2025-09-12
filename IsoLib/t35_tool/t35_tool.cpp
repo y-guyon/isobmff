@@ -41,14 +41,6 @@ extern "C" {
 #include <nlohmann/json.hpp>
 
 
-static void fourccToStr(u32 fcc, char out[5]) {
-  out[0] = char((fcc >> 24) & 0xFF);
-  out[1] = char((fcc >> 16) & 0xFF);
-  out[2] = char((fcc >>  8) & 0xFF);
-  out[3] = char((fcc      ) & 0xFF);
-  out[4] = 0;
-}
-
 struct MetadataItem {
   uint32_t frame_start;
   uint32_t frame_duration;
@@ -475,6 +467,131 @@ static MP4Err injectMetadata(MP4Movie moov,
   return MP4NoErr;
 }
 
+
+static MP4Err extractMebxSamples(MP4Movie moov, const std::string& inputFile) {
+  std::cout << "Extracting SMPTE 2094-50 metadata (mebx)...\n";
+
+  MP4Err err = MP4NoErr;
+  MP4Media mediaM = nullptr;
+  u32 trackCount = 0;
+
+  err = MP4GetMovieTrackCount(moov, &trackCount);
+  if (err) return err;
+
+  // --- Step 1: locate mebx track ---
+  for (u32 i = 1; i <= trackCount; ++i) {
+    MP4Track trak = nullptr;
+    MP4Media media = nullptr;
+    u32 handlerType = 0;
+
+    err = MP4GetMovieIndTrack(moov, i, &trak);
+    if (err) continue;
+
+    err = MP4GetTrackMedia(trak, &media);
+    if (err) continue;
+
+    err = MP4GetMediaHandlerDescription(media, &handlerType, nullptr);
+    if (err) continue;
+
+    if (handlerType != MP4MetaHandlerType) {
+      continue; // not metadata handler
+    }
+
+    // Create track reader
+    MP4TrackReader reader = nullptr;
+    err = MP4CreateTrackReader(trak, &reader);
+    if (err) continue;
+
+    MP4Handle sampleEntryH = nullptr;
+    err = MP4NewHandle(0, &sampleEntryH);
+    if (err) {
+      MP4DisposeTrackReader(reader);
+      continue;
+    }
+
+    // Get current sample description
+    err = MP4TrackReaderGetCurrentSampleDescription(reader, sampleEntryH);
+    if (err) {
+      MP4DisposeHandle(sampleEntryH);
+      MP4DisposeTrackReader(reader);
+      continue;
+    }
+
+    // Check if it's 'mebx'
+    u32 type = 0;
+    err = ISOGetSampleDescriptionType(sampleEntryH, &type);
+    MP4DisposeHandle(sampleEntryH);
+    MP4DisposeTrackReader(reader);
+    if (err) continue;
+
+    if (type == MP4BoxedMetadataSampleEntryType) { // == 'mebx'
+      mediaM = media;
+      break;
+    }
+  }
+
+  if (!mediaM) {
+    std::cerr << "No 'mebx' metadata track found in movie\n";
+    return MP4NotFoundErr;
+  }
+
+  // --- Step 2: get sample count ---
+  u32 sampleCount = 0;
+  err = MP4GetMediaSampleCount(mediaM, &sampleCount);
+  if (err) return err;
+  if (sampleCount == 0) {
+    std::cerr << "MEBX track has no samples\n";
+    return MP4NoErr;
+  }
+
+  // --- Step 3: create output folder ---
+  namespace fs = std::filesystem;
+  fs::path outDir = fs::path(inputFile).stem().string() + "_dump";
+  if (!fs::exists(outDir)) {
+    fs::create_directory(outDir);
+  }
+
+  std::cout << "Extracting " << sampleCount << " mebx samples to "
+            << outDir << "\n";
+
+  // --- Step 4: dump each sample ---
+  for (u32 i = 1; i <= sampleCount; ++i) {
+    MP4Handle sampleH = nullptr;
+    u32 outSize = 0, outSampleFlags = 0, outSampleDescIndex = 0;
+    u64 outDTS = 0, outDuration = 0;
+    s32 outCTSOffset = 0;
+
+    err = MP4NewHandle(0, &sampleH);
+    if (err) return err;
+
+    err = MP4GetIndMediaSample(mediaM, i, sampleH, &outSize, &outDTS,
+                               &outCTSOffset, &outDuration, &outSampleFlags,
+                               &outSampleDescIndex);
+    if (err) {
+      MP4DisposeHandle(sampleH);
+      return err;
+    }
+
+    // Write .bin file
+    fs::path outFile = outDir / ("sample_" + std::to_string(i) + ".bin");
+    std::ofstream out(outFile, std::ios::binary);
+    if (!out) {
+      std::cerr << "Failed to open " << outFile << " for writing\n";
+      MP4DisposeHandle(sampleH);
+      return MP4IOErr;
+    }
+
+    out.write((char*)*sampleH, outSize);
+    out.close();
+
+    std::cout << "  wrote " << outFile << " (" << outSize << " bytes)\n";
+
+    MP4DisposeHandle(sampleH);
+  }
+
+  return MP4NoErr;
+}
+
 int main(int argc, char** argv) {
   CLI::App app{"ITU-T T.35 metadata tool"};
 
@@ -488,11 +605,13 @@ int main(int argc, char** argv) {
   auto inject = app.add_subcommand("inject", "Inject metadata into MP4");
   inject->add_option("metadata", metadataFolder, "Folder with metadata")->required();
   inject->add_option("mode", mode, "Injection mode: mebx or sei")
+        ->default_val("mebx")
         ->check(CLI::IsMember({"mebx", "sei"}));
 
   // Subcommand: extract
   auto extract = app.add_subcommand("extract", "Extract metadata from MP4");
   extract->add_option("mode", mode, "Extraction mode: mebx or sei")
+         ->default_val("mebx")
          ->check(CLI::IsMember({"mebx", "sei"}));
 
   CLI11_PARSE(app, argc, argv);
@@ -550,7 +669,7 @@ int main(int argc, char** argv) {
     std::cout << "Mode            : " << mode << "\n";
 
     if (mode == "mebx") {
-      std::cout << "TODO: dump mebx samples\n";
+      extractMebxSamples(moov, inputFile);
     } else if (mode == "sei") {
       std::cout << "TODO: dump video track + mebx as SEIs\n";
     }
