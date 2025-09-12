@@ -27,7 +27,7 @@ extern "C" {
   #include "MP4Atoms.h"
 }
 
-// C++ headers
+// C++ standard library headers
 #include <filesystem>
 #include <fstream>
 #include <iostream>
@@ -35,6 +35,9 @@ extern "C" {
 #include <string>
 #include <vector>
 #include <map>
+
+// 3rd party headers
+#include <CLI/CLI.hpp>
 #include <nlohmann/json.hpp>
 
 
@@ -473,57 +476,44 @@ static MP4Err injectMetadata(MP4Movie moov,
 }
 
 int main(int argc, char** argv) {
-  if (argc < 4 || argc > 5) {
-    std::cerr << "Usage: t35_tool input.mp4 metadata_folder action [mode]\n";
-    std::cerr << "  action: 'inject' or 'extract'\n";
-    std::cerr << "  mode  : 'mebx' or 'sei' (required only for 'inject')\n";
-    return 1;
-  }
+  CLI::App app{"ITU-T T.35 metadata tool"};
 
-  std::string inputFile      = argv[1];
-  std::string metadataFolder = argv[2];
-  std::string action         = argv[3];
-  std::string mode;
+  std::string inputFile;
+  std::string metadataFolder;
+  std::string mode = "mebx"; // default mode
 
-  if (action != "inject" && action != "extract") {
-    std::cerr << "Invalid action: " << action << "\n";
-    std::cerr << "Must be either 'inject' or 'extract'\n";
-    return 1;
-  }
+  app.add_option("input", inputFile, "Input file")->required();
 
-  if (action == "inject") {
-    if (argc != 5) {
-      std::cerr << "Inject mode requires a 'mode' argument (mebx or sei)\n";
-      return 1;
-    }
-    mode = argv[4];
-    if (mode != "mebx" && mode != "sei") {
-      std::cerr << "Invalid mode: " << mode << "\n";
-      std::cerr << "Must be either 'mebx' or 'sei'\n";
-      return 1;
-    }
-  }
+  // Subcommand: inject
+  auto inject = app.add_subcommand("inject", "Inject metadata into MP4");
+  inject->add_option("metadata", metadataFolder, "Folder with metadata")->required();
+  inject->add_option("mode", mode, "Injection mode: mebx or sei")
+        ->check(CLI::IsMember({"mebx", "sei"}));
 
-  std::cout << "Input file      : " << inputFile << "\n";
-  std::cout << "Metadata folder : " << metadataFolder << "\n";
-  std::cout << "Action          : " << action << "\n";
-  if (action == "inject") {
-    std::cout << "Mode            : " << mode << "\n";
-  }
+  // Subcommand: extract
+  auto extract = app.add_subcommand("extract", "Extract metadata from MP4");
+  extract->add_option("mode", mode, "Extraction mode: mebx or sei")
+         ->check(CLI::IsMember({"mebx", "sei"}));
+
+  CLI11_PARSE(app, argc, argv);
 
   MP4Err err = MP4NoErr;
   MP4Movie moov = nullptr;
 
   // Open MP4
-  err = MP4OpenMovieFile(&moov, inputFile.c_str(), MP4OpenMovieDebug);
-  // return MP4NoErr; // debug
-
+  err = MP4OpenMovieFile(&moov, inputFile.c_str(), MP4OpenMovieNormal);
   if (err) {
     std::cerr << "Failed to open " << inputFile << " (err=" << err << ")\n";
     return err;
   }
 
-  if (action == "inject") {
+  if (*inject) 
+  {
+    std::cout << "Input file      : " << inputFile << "\n";
+    std::cout << "Metadata folder : " << metadataFolder << "\n";
+    std::cout << "Action          : inject\n";
+    std::cout << "Mode            : " << mode << "\n";
+
     // Step 1: parse metadata folder
     auto items = parseMetadataFolder(metadataFolder);
 
@@ -552,9 +542,18 @@ int main(int argc, char** argv) {
         std::cerr << "Failed to write output file (err=" << err << ")\n";
       }
     }
-  } else if (action == "extract") {
-    // TODO: extraction logic
-    std::cout << "Extraction not yet implemented.\n";
+  } 
+  else if (*extract) 
+  {
+    std::cout << "Input file      : " << inputFile << "\n";
+    std::cout << "Action          : extract\n";
+    std::cout << "Mode            : " << mode << "\n";
+
+    if (mode == "mebx") {
+      std::cout << "TODO: dump mebx samples\n";
+    } else if (mode == "sei") {
+      std::cout << "TODO: dump video track + mebx as SEIs\n";
+    }
   }
 
   MP4DisposeMovie(moov);

@@ -41,6 +41,14 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(json)
 
+# CLI11 (header-only)
+FetchContent_Declare(
+  cli11
+  GIT_REPOSITORY https://github.com/CLIUtils/CLI11
+  GIT_TAG        v2.5.0
+)
+FetchContent_MakeAvailable(cli11)
+
 # ---- Executable ----
 add_executable(
   t35_tool
@@ -54,4 +62,5 @@ target_link_libraries(
   PRIVATE
     libisomediafile
     nlohmann_json::nlohmann_json
+    CLI11::CLI11
 )
