@@ -258,7 +258,8 @@ static MP4Err buildMetadataDurationsAndSizes( const MetadataMap& items,
 static MP4Err addAllMetadataSamples(MP4Media mediaM,
                                     const std::vector<MetadataItem>& sortedItems,
                                     const std::vector<u32>& metadataDurations,
-                                    const std::vector<u32>& metadataSizes)
+                                    const std::vector<u32>& metadataSizes,
+                                    u32 local_key_id)
 {
   MP4Err err = MP4NoErr;
   u32 sampleCount = static_cast<u32>(sortedItems.size());
@@ -297,12 +298,12 @@ static MP4Err addAllMetadataSamples(MP4Media mediaM,
     if (allSame) {
       err = MP4NewHandle(sizeof(u32), &sizesH);
       if (err) goto bail;
-      *((u32*)*sizesH) = metadataSizes[0];
+      *((u32*)*sizesH) = metadataSizes[0] + 8; // +4 box_size +4 box_type
     } else {
       err = MP4NewHandle(sizeof(u32) * sampleCount, &sizesH);
       if (err) goto bail;
       for (u32 n = 0; n < sampleCount; ++n) {
-        ((u32*)*sizesH)[n] = metadataSizes[n];
+        ((u32*)*sizesH)[n] = metadataSizes[n] + 8; // +4 box_size +4 box_type
       }
     }
   }
@@ -310,21 +311,37 @@ static MP4Err addAllMetadataSamples(MP4Media mediaM,
   // --- Sample data handle ---
   totalSize = 0;
   for (u32 n = 0; n < sampleCount; ++n) {
-    totalSize += metadataSizes[n];
+    totalSize += metadataSizes[n] + 8;
   }
   err = MP4NewHandle((u32)totalSize, &sampleDataH);
   if (err) goto bail;
 
   {
     char* dst = reinterpret_cast<char*>(*sampleDataH);
-    for (u32 n = 0; n < sampleCount; ++n) {
+    for (u32 n = 0; n < sampleCount; ++n)
+    {
       const MetadataItem& item = sortedItems[n];
       std::ifstream binFile(item.bin_path, std::ios::binary);
-      if (!binFile) {
+      if (!binFile) 
+      {
         std::cerr << "Failed to open .bin file: " << item.bin_path << "\n";
         err = MP4IOErr;
         goto bail;
       }
+
+      u32 boxSize = 8 + metadataSizes[n];
+      // write size
+      dst[0] = (boxSize >> 24) & 0xFF;
+      dst[1] = (boxSize >> 16) & 0xFF;
+      dst[2] = (boxSize >>  8) & 0xFF;
+      dst[3] = (boxSize      ) & 0xFF;
+      // write type (local_key_id)
+      dst[4] = (local_key_id >> 24) & 0xFF;
+      dst[5] = (local_key_id >> 16) & 0xFF;
+      dst[6] = (local_key_id >>  8) & 0xFF;
+      dst[7] = (local_key_id      ) & 0xFF;
+      dst += 8;
+
       binFile.read(dst, metadataSizes[n]);
       dst += metadataSizes[n];
     }
@@ -449,7 +466,7 @@ static MP4Err injectMetadata(MP4Movie moov,
     err = buildMetadataDurationsAndSizes(items, videoDurations, metadataDurations, metadataSizes, sortedItems);
     if (err) return err;
 
-    err = addAllMetadataSamples(mediaM, sortedItems, metadataDurations, metadataSizes);
+    err = addAllMetadataSamples(mediaM, sortedItems, metadataDurations, metadataSizes, local_key_id);
     if (err) return err;
 
     err = MP4EndMediaEdits(mediaM);
@@ -468,18 +485,22 @@ static MP4Err injectMetadata(MP4Movie moov,
 }
 
 
-static MP4Err extractMebxSamples(MP4Movie moov, const std::string& inputFile) {
-  std::cout << "Extracting SMPTE 2094-50 metadata (mebx)...\n";
-
+static MP4Err getMebxAndVideoTrackReaders(MP4Movie moov,
+                                          MP4TrackReader* outMebxReader,
+                                          MP4TrackReader* outVideoReader)
+{
   MP4Err err = MP4NoErr;
-  MP4Media mediaM = nullptr;
-  u32 trackCount = 0;
+  if (outMebxReader) *outMebxReader = nullptr;
+  if (outVideoReader) *outVideoReader = nullptr;
 
+  u32 trackCount = 0;
   err = MP4GetMovieTrackCount(moov, &trackCount);
   if (err) return err;
 
-  // --- Step 1: locate mebx track ---
-  for (u32 i = 1; i <= trackCount; ++i) {
+  // --- Step 1: find mebx track ---
+  MP4Track mebxTrack = nullptr;
+  for (u32 i = 1; i <= trackCount; ++i) 
+  {
     MP4Track trak = nullptr;
     MP4Media media = nullptr;
     u32 handlerType = 0;
@@ -493,9 +514,7 @@ static MP4Err extractMebxSamples(MP4Movie moov, const std::string& inputFile) {
     err = MP4GetMediaHandlerDescription(media, &handlerType, nullptr);
     if (err) continue;
 
-    if (handlerType != MP4MetaHandlerType) {
-      continue; // not metadata handler
-    }
+    if (handlerType != MP4MetaHandlerType) continue; // only metadata tracks
 
     // Create track reader
     MP4TrackReader reader = nullptr;
@@ -504,10 +523,7 @@ static MP4Err extractMebxSamples(MP4Movie moov, const std::string& inputFile) {
 
     MP4Handle sampleEntryH = nullptr;
     err = MP4NewHandle(0, &sampleEntryH);
-    if (err) {
-      MP4DisposeTrackReader(reader);
-      continue;
-    }
+    if (err) { MP4DisposeTrackReader(reader); continue; }
 
     // Get current sample description
     err = MP4TrackReaderGetCurrentSampleDescription(reader, sampleEntryH);
@@ -520,57 +536,112 @@ static MP4Err extractMebxSamples(MP4Movie moov, const std::string& inputFile) {
     // Check if it's 'mebx'
     u32 type = 0;
     err = ISOGetSampleDescriptionType(sampleEntryH, &type);
+
     MP4DisposeHandle(sampleEntryH);
     MP4DisposeTrackReader(reader);
     if (err) continue;
 
-    if (type == MP4BoxedMetadataSampleEntryType) { // == 'mebx'
-      mediaM = media;
+    if (type == MP4BoxedMetadataSampleEntryType) {
+      mebxTrack = trak;
       break;
     }
   }
 
-  if (!mediaM) {
-    std::cerr << "No 'mebx' metadata track found in movie\n";
+  if (!mebxTrack) {
+    std::cerr << "No 'mebx' metadata track found\n";
     return MP4NotFoundErr;
   }
 
-  // --- Step 2: get sample count ---
-  u32 sampleCount = 0;
-  err = MP4GetMediaSampleCount(mediaM, &sampleCount);
+  // --- Step 2: create mebx reader ---
+  MP4TrackReader mebxReader = nullptr;
+  err = MP4CreateTrackReader(mebxTrack, &mebxReader);
   if (err) return err;
-  if (sampleCount == 0) {
-    std::cerr << "MEBX track has no samples\n";
-    return MP4NoErr;
+
+  // --- Step 3: find associated video track ---
+  MP4Track videoTrack = nullptr;
+  err = MP4GetTrackReference(mebxTrack, MP4DescTrackReferenceType, 1, &videoTrack);
+  if (err) {
+    MP4DisposeTrackReader(mebxReader);
+    return err;
   }
 
-  // --- Step 3: create output folder ---
+  // --- Step 4: create video reader ---
+  MP4TrackReader videoReader = nullptr;
+  if (outVideoReader) { // Caller wants a video reader
+    err = MP4CreateTrackReader(videoTrack, &videoReader);
+    if (err) {
+      MP4DisposeTrackReader(mebxReader);
+      return err;
+    }
+  }
+
+  if (outMebxReader) *outMebxReader = mebxReader;
+  if (outVideoReader) *outVideoReader = videoReader;
+
+  return MP4NoErr;
+}
+
+
+static MP4Err extractMebxSamples(MP4Movie moov, const std::string& inputFile) 
+{
+  std::cout << "Extracting SMPTE 2094-50 metadata (mebx)...\n";
+
+  MP4Err err = MP4NoErr;
+  MP4TrackReader mebxReader = nullptr;
+
+  // --- Step 1: get mebx track reader ---
+  err = getMebxAndVideoTrackReaders(moov, &mebxReader, nullptr);
+  if (err) return err;
+
+  // TODO: select which local key to use
+  // err = ISOGetMebxMetadataCount(sampleEntryH, &key_cnt);
+  // for(u32 i = 0; i < key_cnt; i++)
+  //   err = ISOGetMebxMetadataConfig(sampleEntryH, i, &local_key_id, &key_namespace, key_value, &locale_string, setupInfo);
+  err = MP4SetMebxTrackReader(mebxReader, 1);
+  if (err) 
+  {
+    std::cerr << "MP4SetMebxTrackReader failed (err=" << err << ")\n";
+    MP4DisposeTrackReader(mebxReader);
+    return err;
+  }
+
+  // --- Step 2: create output folder ---
   namespace fs = std::filesystem;
   fs::path outDir = fs::path(inputFile).stem().string() + "_dump";
   if (!fs::exists(outDir)) {
     fs::create_directory(outDir);
   }
+  std::cout << "Extracting mebx samples to " << outDir << "\n";
 
-  std::cout << "Extracting " << sampleCount << " mebx samples to "
-            << outDir << "\n";
-
-  // --- Step 4: dump each sample ---
-  for (u32 i = 1; i <= sampleCount; ++i) {
+  // --- Step 3: dump each sample ---
+  u32 mebxSampleCount = 0;
+  for (u32 i = 1; ; ++i) 
+  {
     MP4Handle sampleH = nullptr;
-    u32 outSize = 0, outSampleFlags = 0, outSampleDescIndex = 0;
-    u64 outDTS = 0, outDuration = 0;
-    s32 outCTSOffset = 0;
+    u32 sampleSize = 0, sampleFlags = 0, sampleDuration = 0;
+    s32 dts = 0, cts = 0;
 
     err = MP4NewHandle(0, &sampleH);
     if (err) return err;
 
-    err = MP4GetIndMediaSample(mediaM, i, sampleH, &outSize, &outDTS,
-                               &outCTSOffset, &outDuration, &outSampleFlags,
-                               &outSampleDescIndex);
+    err = MP4TrackReaderGetNextAccessUnitWithDuration(
+            mebxReader,
+            sampleH,
+            &sampleSize,
+            &sampleFlags,
+            &dts,
+            &cts,
+            &sampleDuration);
+
     if (err) {
       MP4DisposeHandle(sampleH);
+      if (err == MP4EOF) {
+        std::cout << "Reached end of mebx samples.\n";
+        err = MP4NoErr;
+      }
       return err;
     }
+    mebxSampleCount++;
 
     // Write .bin file
     fs::path outFile = outDir / ("sample_" + std::to_string(i) + ".bin");
@@ -581,14 +652,60 @@ static MP4Err extractMebxSamples(MP4Movie moov, const std::string& inputFile) {
       return MP4IOErr;
     }
 
-    out.write((char*)*sampleH, outSize);
+    out.write((char*)*sampleH, sampleSize);
     out.close();
 
-    std::cout << "  wrote " << outFile << " (" << outSize << " bytes)\n";
+    std::cout << "  wrote " << outFile 
+          << " (" << sampleSize << " bytes)"
+          << " DTS=" << dts 
+          << " Duration=" << sampleDuration 
+          << "\n";
 
     MP4DisposeHandle(sampleH);
   }
 
+  MP4DisposeTrackReader(mebxReader);
+  return MP4NoErr;
+}
+
+static MP4Err dumpHevcWithMebxSei(MP4Movie moov, const std::string& inputFile)
+{
+  MP4Err err = MP4NoErr;
+  MP4TrackReader mebxReader = nullptr;
+  MP4TrackReader videoReader = nullptr;
+
+  // --- Step 1: get track readers ---
+  err = getMebxAndVideoTrackReaders(moov, &mebxReader, &videoReader);
+  if (err) return err;
+
+  // TODO: check video is HEVC
+  
+  // TODO: get length_size_minus1 from HEVC sample entry, we need it to parse NAL units
+
+  // --- Step X: prepare output file ---
+  namespace fs = std::filesystem;
+  fs::path outFile = fs::path(inputFile).stem().string() + "_sei.hevc";
+  std::ofstream out(outFile, std::ios::binary);
+  if (!out) {
+    std::cerr << "Failed to open " << outFile << " for writing\n";
+    return MP4IOErr;
+  }
+
+  std::cout << "Dumping HEVC bitstream with mebx SEIs into " << outFile << "\n";
+
+
+  // --- Step X: iterate video samples ---
+  
+  // TODO: get video sample and associated mebx sample, write SEI NAL unit before video sample, do emulation prevention
+  // Write raw video sample to output stream
+  // replace length prefixes with start codes
+    
+
+  out.close();
+  std::cout << "Finished writing " << outFile << "\n";
+
+  MP4DisposeTrackReader(mebxReader);
+  MP4DisposeTrackReader(videoReader);
   return MP4NoErr;
 }
 
@@ -669,13 +786,22 @@ int main(int argc, char** argv) {
     std::cout << "Mode            : " << mode << "\n";
 
     if (mode == "mebx") {
-      extractMebxSamples(moov, inputFile);
+      err = extractMebxSamples(moov, inputFile);
+      if (err) {
+        std::cerr << "Extraction failed with err=" << err << "\n";
+      } else {
+        std::cout << "Extraction completed successfully.\n";
+      }
     } else if (mode == "sei") {
-      std::cout << "TODO: dump video track + mebx as SEIs\n";
+      err = dumpHevcWithMebxSei(moov, inputFile);
+      if (err) {
+        std::cerr << "Dumping HEVC with SEI failed with err=" << err << "\n";
+      } else {
+        std::cout << "Dumping HEVC with SEI completed successfully.\n";
+      }
     }
   }
 
   MP4DisposeMovie(moov);
   return 0;
 }
-

@@ -251,6 +251,9 @@ bail:
   return err;
 }
 
+/* TODO: use key_namespace and key_value as input. key_id can be found inside automatically */
+/* also verify that that combination is unique, caller should know this. */
+/* local_key_id could be returned (optional) */
 MP4_EXTERN(MP4Err)
 MP4SetMebxTrackReader(MP4TrackReader theReader, u32 local_key)
 {
