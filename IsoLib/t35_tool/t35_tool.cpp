@@ -450,8 +450,8 @@ static MP4Err injectMetadata(MP4Movie moov,
     err = MP4NewTrackMedia(trakM, &mediaM, MP4MetaHandlerType, videoTimescale, NULL);
     if (err) return err;
 
-    // Link metadata track to video track
-    err = MP4AddTrackReference(trakM, trakV, MP4DescTrackReferenceType, 0);
+    // Link metadata track to video track using 'rndr' track reference
+    err = MP4AddTrackReference(trakM, trakV, MP4_FOUR_CHAR_CODE('r', 'n', 'd', 'r'), 0);
     if (err) return err;
 
     // Create mebx sample entry
@@ -586,7 +586,7 @@ static MP4Err getMebxAndVideoTrackReaders(MP4Movie moov,
 
   // --- Step 3: find associated video track ---
   MP4Track videoTrack = nullptr;
-  err = MP4GetTrackReference(mebxTrack, MP4DescTrackReferenceType, 1, &videoTrack);
+  err = MP4GetTrackReference(mebxTrack, MP4_FOUR_CHAR_CODE('r', 'n', 'd', 'r'), 1, &videoTrack);
   if (err) {
     MP4DisposeTrackReader(mebxReader);
     return err;
