@@ -40,6 +40,7 @@ extern "C" {
 #include <CLI/CLI.hpp>
 #include <nlohmann/json.hpp>
 
+constexpr bool STRING_TO_HANDLE_MODE = true;   // true = hex, false = text
 
 struct MetadataItem {
   uint32_t frame_start;
@@ -371,10 +372,46 @@ bail:
   return err;
 }
 
+static MP4Err stringToHandle(const std::string& input, MP4Handle* outHandle, bool asHex)
+{
+  MP4Err err = MP4NoErr;
+  *outHandle = nullptr;
+
+  if (asHex) {
+    if (input.size() % 2 != 0) {
+      std::cerr << "Invalid hex string length: " << input << "\n";
+      return MP4BadParamErr;
+    }
+    u32 byteCount = static_cast<u32>(input.size() / 2);
+    err = MP4NewHandle(byteCount, outHandle);
+    if (err) return err;
+
+    for (u32 i = 0; i < byteCount; i++) {
+      unsigned int byteVal = 0;
+      std::string byteStr = input.substr(i * 2, 2);
+      if (sscanf(byteStr.c_str(), "%02x", &byteVal) != 1) {
+        std::cerr << "Invalid hex substring: " << byteStr << "\n";
+        MP4DisposeHandle(*outHandle);
+        *outHandle = nullptr;
+        return MP4BadParamErr;
+      }
+      (**outHandle)[i] = static_cast<u8>(byteVal);
+    }
+  } else {
+    u32 byteCount = static_cast<u32>(input.size());
+    err = MP4NewHandle(byteCount, outHandle);
+    if (err) return err;
+
+    memcpy(**outHandle, input.data(), byteCount);
+  }
+
+  return MP4NoErr;
+}
 
 static MP4Err injectMetadata(MP4Movie moov,
                              const std::string& mode,
-                             const MetadataMap& items)
+                             const MetadataMap& items,
+                             const std::string& t35PrefixHex)
 {
   std::cout << "Injecting SMPTE 2094-50 metadata (" << mode << ")...\n";
 
@@ -422,20 +459,10 @@ static MP4Err injectMetadata(MP4Movie moov,
     err = ISONewMebxSampleDescription(&mebx, 1);
     if (err) return err;
 
-    // Build dmcvt handle
-    MP4Handle dmcvtH = nullptr;
-    err = MP4NewHandle(30, &dmcvtH);
+    // Build T.35 Prefix handle
+    MP4Handle key_value = nullptr;
+    err = stringToHandle(t35PrefixHex, &key_value, STRING_TO_HANDLE_MODE);
     if (err) return err;
-
-    // First 5 bytes: binary prefix according to generic definition
-    (*dmcvtH)[0] = 0xB5;
-    (*dmcvtH)[1] = 0x00;
-    (*dmcvtH)[2] = 0x90;
-    (*dmcvtH)[3] = 0x00;
-    (*dmcvtH)[4] = 0x01;
-    // Rest: ASCII string "smpte_st_2094_50_dmcvt_v1"
-    const char dmcvStr[] = "smpte_st_2094_50_dmcvt_v1";
-    std::memcpy(&(*dmcvtH)[5], dmcvStr, sizeof(dmcvStr) - 1);
 
     // Add sample entry
     u32 local_key_id = 0;
@@ -444,7 +471,7 @@ static MP4Err injectMetadata(MP4Movie moov,
               1,
               &local_key_id,
               MP4_FOUR_CHAR_CODE('i', 't', '3', '5'),
-              dmcvtH,
+              key_value,
               0,
               0);
     if (err) return err;
@@ -582,8 +609,7 @@ static MP4Err getMebxAndVideoTrackReaders(MP4Movie moov,
 }
 
 
-// TODO: add parameter with T.35 prefix to look for e.g.: B500900001
-static MP4Err extractMebxSamples(MP4Movie moov, const std::string& inputFile) 
+static MP4Err extractMebxSamples(MP4Movie moov, const std::string& inputFile, const std::string& t35PrefixHex) 
 {
   std::cout << "Extracting SMPTE 2094-50 metadata (mebx)...\n";
 
@@ -597,17 +623,8 @@ static MP4Err extractMebxSamples(MP4Movie moov, const std::string& inputFile)
   // --- Step 1.1: set key_namespace and key_value that we are looking for ---
   u32 key_namespace = MP4_FOUR_CHAR_CODE('i', 't', '3', '5');
   MP4Handle key_value = nullptr;
-  err = MP4NewHandle(30, &key_value);
+  err = stringToHandle(t35PrefixHex, &key_value, STRING_TO_HANDLE_MODE);
   if (err) return err;
-  // First 5 bytes: binary prefix according to generic definition
-  (*key_value)[0] = 0xB5;
-  (*key_value)[1] = 0x00;
-  (*key_value)[2] = 0x90;
-  (*key_value)[3] = 0x00;
-  (*key_value)[4] = 0x01;
-  // Rest: ASCII string "smpte_st_2094_50_dmcvt_v1"
-  const char dmcvStr[] = "smpte_st_2094_50_dmcvt_v1";
-  std::memcpy(&(*key_value)[5], dmcvStr, sizeof(dmcvStr) - 1);
 
   // --- Step 1.2: select the key ---
   u32 local_key_id = 0;
@@ -755,6 +772,7 @@ int main(int argc, char** argv) {
   std::string inputFile;
   std::string metadataFolder;
   std::string mode = "mebx"; // default mode
+  std::string t35PrefixHex;
 
   app.add_option("input", inputFile, "Input file")->required();
 
@@ -764,12 +782,16 @@ int main(int argc, char** argv) {
   inject->add_option("mode", mode, "Injection mode: mebx or sei")
         ->default_val("mebx")
         ->check(CLI::IsMember({"mebx", "sei"}));
+  inject->add_option("--t35-prefix", t35PrefixHex, "T.35 prefix as hex string")
+        ->default_val("B500900001");
 
   // Subcommand: extract
   auto extract = app.add_subcommand("extract", "Extract metadata from MP4");
   extract->add_option("mode", mode, "Extraction mode: mebx or sei")
          ->default_val("mebx")
          ->check(CLI::IsMember({"mebx", "sei"}));
+  extract->add_option("--t35-prefix", t35PrefixHex, "T.35 prefix as hex string")
+         ->default_val("B500900001");
 
   CLI11_PARSE(app, argc, argv);
 
@@ -789,6 +811,7 @@ int main(int argc, char** argv) {
     std::cout << "Metadata folder : " << metadataFolder << "\n";
     std::cout << "Action          : inject\n";
     std::cout << "Mode            : " << mode << "\n";
+    std::cout << "T.35 prefix     : " << t35PrefixHex << "\n";
 
     // Step 1: parse metadata folder
     auto items = parseMetadataFolder(metadataFolder);
@@ -799,7 +822,7 @@ int main(int argc, char** argv) {
       std::cout << "Parsed " << items.size() << " metadata items\n";
     }
 
-    err = injectMetadata(moov, mode, items);
+    err = injectMetadata(moov, mode, items, t35PrefixHex);
     if (err) {
       std::cerr << "Injection failed with err=" << err << "\n";
     } else {
@@ -824,9 +847,10 @@ int main(int argc, char** argv) {
     std::cout << "Input file      : " << inputFile << "\n";
     std::cout << "Action          : extract\n";
     std::cout << "Mode            : " << mode << "\n";
+    std::cout << "T.35 prefix     : " << t35PrefixHex << "\n";
 
     if (mode == "mebx") {
-      err = extractMebxSamples(moov, inputFile);
+      err = extractMebxSamples(moov, inputFile, t35PrefixHex);
       if (err) {
         std::cerr << "Extraction failed with err=" << err << "\n";
       } else {
