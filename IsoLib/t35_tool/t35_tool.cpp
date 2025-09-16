@@ -582,6 +582,7 @@ static MP4Err getMebxAndVideoTrackReaders(MP4Movie moov,
 }
 
 
+// TODO: add parameter with T.35 prefix to look for e.g.: B500900001
 static MP4Err extractMebxSamples(MP4Movie moov, const std::string& inputFile) 
 {
   std::cout << "Extracting SMPTE 2094-50 metadata (mebx)...\n";
@@ -697,11 +698,29 @@ static MP4Err dumpHevcWithMebxSei(MP4Movie moov, const std::string& inputFile)
   err = getMebxAndVideoTrackReaders(moov, &mebxReader, &videoReader);
   if (err) return err;
 
-  // TODO: check video is HEVC
-  
-  // TODO: get length_size_minus1 from HEVC sample entry, we need it to parse NAL units
+  // --- Step 2: get HEVC NALUs and legth_size_minus1+1 from sample entry ---
+  MP4Handle videoSampleEntryH;
+  err = MP4NewHandle(0, &videoSampleEntryH);
+  if (err) return err;
+  err = MP4TrackReaderGetCurrentSampleDescription(videoReader, videoSampleEntryH);
+  if (err) return err;
+  MP4Handle sampleEntryNALs = nullptr;
+  MP4NewHandle(0, &sampleEntryNALs);
+  err = ISOGetHEVCNALUs(videoSampleEntryH, sampleEntryNALs, 0);
+  if(err)
+  {
+    std::cerr << "Failed to extract NAL units from sample entry (err=" << err << ")\n";
+    return err;
+  }
+  u32 length_size = 0;
+  err = ISOGetNALUnitLength(videoSampleEntryH, &length_size);
+  if (err) {
+    std::cerr << "Failed to get NAL unit length size (err=" << err << ")\n";
+    return err;
+  }
+  std::cout << "HEVC NAL unit length size = " << length_size << "\n";
 
-  // --- Step X: prepare output file ---
+  // --- Step 3: prepare output file and dump NALs from sample entry ---
   namespace fs = std::filesystem;
   fs::path outFile = fs::path(inputFile).stem().string() + "_sei.hevc";
   std::ofstream out(outFile, std::ios::binary);
@@ -709,8 +728,10 @@ static MP4Err dumpHevcWithMebxSei(MP4Movie moov, const std::string& inputFile)
     std::cerr << "Failed to open " << outFile << " for writing\n";
     return MP4IOErr;
   }
-
-  std::cout << "Dumping HEVC bitstream with mebx SEIs into " << outFile << "\n";
+  u32 sampleEntryNalSize = 0;
+  MP4GetHandleSize(sampleEntryNALs, &sampleEntryNalSize);
+  out.write((char*)*sampleEntryNALs, sampleEntryNalSize);
+  std::cout << "Wrote " << sampleEntryNalSize << " bytes decoder configuration data into " << outFile << "\n";
 
 
   // --- Step X: iterate video samples ---
