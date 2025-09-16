@@ -737,7 +737,7 @@ static MP4Err getSampleGroupSampleNumbers(struct MP4SampleTableAtom *self, u32 g
       (*outSampleNumbers)[(*outSampleCnt)++] = i;
     }
   }
-  else 
+  else
   {
     /* TODO: make sure we can also get it based on default_group_description_index, */
   }

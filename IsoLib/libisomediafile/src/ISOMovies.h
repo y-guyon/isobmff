@@ -311,7 +311,8 @@ extern "C"
 #define ISOGetUserDataTypeCount MP4GetUserDataTypeCount
 #define ISONewUserData MP4NewUserData
 #define ISOCreateTrackReader MP4CreateTrackReader
-#define ISOSetMebxTrackReader MP4SetMebxTrackReader
+#define ISOSetMebxTrackReaderLocalKeyId MP4SetMebxTrackReaderLocalKeyId
+#define ISOSelectMebxTrackReaderKey MP4SelectMebxTrackReaderKey
 #define ISODisposeTrackReader MP4DisposeTrackReader
 #define ISONewHandle MP4NewHandle
 #define ISOSetHandleSize MP4SetHandleSize
@@ -800,11 +801,27 @@ extern "C"
    * @param sampleEntryH input sample entry of the mebx track
    * @param key_cnt number of local_key_id's
    */
-  ISO_EXTERN(ISOErr)
-  ISOGetMebxMetadataCount(MP4Handle sampleEntryH, u32 *key_cnt);
+  ISO_EXTERN(ISOErr) ISOGetMebxMetadataCount(MP4Handle sampleEntryH, u32 *key_cnt);
 
+  /**
+   * @brief Get metadata key configuration from a 'mebx' sample entry.
+   *
+   * Retrieves the key information at index @p idx from the MetadataKeyTableBox. Returns namespace,
+   * value, locale, setup data, and the local_key_id for this entry.
+   *
+   * @param sampleEntryH Handle containing the 'mebx' sample entry.
+   * @param idx Zero-based index of the key entry to query.
+   * @param local_key_id Output; receives the local_key_id for this key.
+   * @param key_namespace Output; receives the namespace FourCC.
+   * @param key_value Optional handle to receive the key value data.
+   * @param locale_string Optional; receives locale string if present.
+   * @param setupInfo Optional handle to receive setup information if present.
+   *
+   * @return ISOErr code: MP4NoErr on success, MP4BadDataErr if no key table, MP4NotFoundErr if not
+   * found, or other error codes.
+   */
   ISO_EXTERN(ISOErr)
-  ISOGetMebxMetadataConfig(MP4Handle sampleEntryH, u32 cnt, u32 *local_key_id, u32 *key_namespace,
+  ISOGetMebxMetadataConfig(MP4Handle sampleEntryH, u32 idx, u32 *local_key_id, u32 *key_namespace,
                            MP4Handle key_value, char **locale_string, MP4Handle setupInfo);
 
   /*************************************************************************************************

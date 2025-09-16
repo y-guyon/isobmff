@@ -1909,7 +1909,7 @@ bail:
 }
 
 ISO_EXTERN(ISOErr)
-ISOGetMebxMetadataConfig(MP4Handle sampleEntryH, u32 cnt, u32 *local_key_id, u32 *key_namespace,
+ISOGetMebxMetadataConfig(MP4Handle sampleEntryH, u32 idx, u32 *local_key_id, u32 *key_namespace,
                          MP4Handle key_value, char **locale_string, MP4Handle setupInfo)
 {
   MP4Err err;
@@ -1922,7 +1922,7 @@ ISOGetMebxMetadataConfig(MP4Handle sampleEntryH, u32 cnt, u32 *local_key_id, u32
 
   if(entry->keyTable == NULL) BAILWITHERROR(MP4BadDataErr);
 
-  err = MP4GetListEntry(entry->keyTable->metadataKeyBoxList, cnt, (char **)&key);
+  err = MP4GetListEntry(entry->keyTable->metadataKeyBoxList, idx, (char **)&key);
   if(err) goto bail;
 
   /* set output values */

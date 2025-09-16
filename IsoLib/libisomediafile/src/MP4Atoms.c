@@ -451,7 +451,7 @@ MP4Err MP4CreateAtom(u32 atomType, MP4AtomPtr *outAtom)
     break;
   */
   case MP4ColorInformationAtomType:
-    err = MP4CreateColorInformationAtom((MP4ColorInformationAtomPtr*)&newAtom);
+    err = MP4CreateColorInformationAtom((MP4ColorInformationAtomPtr *)&newAtom);
     break;
 
   case MJ2JP2HeaderAtomType:

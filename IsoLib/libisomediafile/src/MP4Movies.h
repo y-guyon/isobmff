@@ -53,6 +53,7 @@ extern "C"
     MP4InvalidMediaErr              = -8,   /**< Invalid media */
     MP4InternalErr                  = -9,   /**< Iternal error */
     MP4NotFoundErr                  = -10,  /**< Not found */
+    MP4DuplicateErr                 = -11,  /**< Duplicate match */
     MP4DataEntryTypeNotSupportedErr = -100, /**< Data entity type not supported */
     MP4NoQTAtomErr                  = -500, /**< No QT atom */
     MP4NotImplementedErr            = -1000 /**< Not implemented */
@@ -1113,12 +1114,14 @@ extern "C"
    *
    * @param media input media object
    * @param itu_t_t35_data pre-serialized (big-endian) T.35 data that will go inside sgpd
-   * @param complete_message_flag If set to 1 indicates that the entire T.35 is stored in itu_t_t35_data
+   * @param complete_message_flag If set to 1 indicates that the entire T.35 is stored in
+   * itu_t_t35_data
    * @param index output index of the added group
    * @return MP4Err error code
    */
   MP4_EXTERN(MP4Err)
-  ISOAddT35GroupDescription(MP4Media media, MP4Handle itu_t_t35_data, u32 complete_message_flag, u32 *index);
+  ISOAddT35GroupDescription(MP4Media media, MP4Handle itu_t_t35_data, u32 complete_message_flag,
+                            u32 *index);
   /**
    * @brief Returns in the handle ‘description’ the group description associated with the given
    * group index of the given group type.
@@ -1757,9 +1760,27 @@ extern "C"
    */
   MP4_EXTERN(MP4Err) MP4CreateTrackReader(MP4Track theTrack, MP4TrackReader *outReader);
   /**
-   * @brief Select local_key for reading. Demux mebx track.
+   * @brief Set local_key_id for reading. Demux mebx track.
    */
-  MP4_EXTERN(MP4Err) MP4SetMebxTrackReader(MP4TrackReader theReader, u32 local_key);
+  MP4_EXTERN(MP4Err) MP4SetMebxTrackReaderLocalKeyId(MP4TrackReader theReader, u32 local_key_id);
+  /**
+   * @brief Select a 'mebx' key for a track reader by namespace and value.
+   *
+   * Looks up a key in the 'mebx' sample description matching @p key_namespace and @p key_value. If
+   * found, sets the corresponding local_key_id on the reader. Optionally returns the resolved
+   * local_key_id.
+   *
+   * @param theReader 'mebx' track reader.
+   * @param key_namespace key namespace from MetadataKeyDeclarationBox
+   * @param key_value key value from MetadataKeyDeclarationBox
+   * @param outLocalKeyId Optional; receives local_key_id if non-NULL.
+   *
+   * @return MP4NoErr if found and set, MP4NotFoundErr if not found, or error code.
+   */
+  MP4_EXTERN(MP4Err)
+  MP4SelectMebxTrackReaderKey(MP4TrackReader theReader, u32 key_namespace, MP4Handle key_value,
+                              u32 *outLocalKeyId);
+
   /**
    * @brief Frees up resources associated with a track reader.
    */

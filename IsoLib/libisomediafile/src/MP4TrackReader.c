@@ -251,11 +251,8 @@ bail:
   return err;
 }
 
-/* TODO: use key_namespace and key_value as input. key_id can be found inside automatically */
-/* also verify that that combination is unique, caller should know this. */
-/* local_key_id could be returned (optional) */
 MP4_EXTERN(MP4Err)
-MP4SetMebxTrackReader(MP4TrackReader theReader, u32 local_key)
+MP4SetMebxTrackReaderLocalKeyId(MP4TrackReader theReader, u32 local_key_id)
 {
   MP4Err err;
   MP4TrackReaderPtr reader;
@@ -264,9 +261,89 @@ MP4SetMebxTrackReader(MP4TrackReader theReader, u32 local_key)
   if(theReader == 0) BAILWITHERROR(MP4BadParamErr)
   reader = (MP4TrackReaderPtr)theReader;
 
-  reader->mebx_local_key = local_key;
+  reader->mebx_local_key_id = local_key_id;
 
 bail:
+  TEST_RETURN(err);
+  return err;
+}
+
+MP4_EXTERN(MP4Err)
+MP4SelectMebxTrackReaderKey(MP4TrackReader theReader, u32 key_namespace, MP4Handle key_value,
+                            u32 *outLocalKeyId)
+{
+  MP4TrackReaderPtr reader;
+  MP4Handle sampleEntryH = NULL;
+  MP4Err err             = MP4NoErr;
+  u32 key_cnt            = 0;
+  u32 found_local_id     = 0;
+  u32 found_count        = 0;
+
+  if((theReader == 0) || (key_value == 0)) BAILWITHERROR(MP4BadParamErr);
+  reader = (MP4TrackReaderPtr)theReader;
+
+  err = MP4NewHandle(0, &sampleEntryH);
+  if(err) goto bail;
+  err = MP4TrackReaderGetCurrentSampleDescription(theReader, sampleEntryH);
+  if(err) goto bail;
+
+  err = ISOGetMebxMetadataCount(sampleEntryH, &key_cnt);
+  if(err) goto bail;
+
+  for(u32 i = 0; i < key_cnt; i++)
+  {
+    u32 local_id   = 0;
+    u32 ns         = 0;
+    MP4Handle valH = NULL;
+
+    err = MP4NewHandle(0, &valH);
+    if(err) goto bail;
+
+    err = ISOGetMebxMetadataConfig(sampleEntryH, i, &local_id, &ns, valH, NULL, NULL);
+    if(err)
+    {
+      MP4DisposeHandle(valH);
+      goto bail;
+    }
+
+    /* Check if this key and value matches */
+    if(ns == key_namespace)
+    {
+      u32 inSize = 0, valSize = 0;
+      MP4GetHandleSize(key_value, &inSize);
+      MP4GetHandleSize(valH, &valSize);
+
+      if(inSize == valSize && memcmp(*key_value, *valH, inSize) == 0)
+      {
+        if(found_count == 0)
+        {
+          found_local_id = local_id;
+        }
+        found_count++;
+      }
+    }
+    MP4DisposeHandle(valH);
+  }
+
+  if(found_count == 0)
+  {
+    err = MP4NotFoundErr;
+    goto bail;
+  }
+
+  /* Set internal local_key_id and return if the user wanted */
+  reader->mebx_local_key_id = found_local_id;
+  if(outLocalKeyId) *outLocalKeyId = found_local_id;
+
+  /* Multiple matches: still set first, but warn */
+  if(found_count > 1)
+  {
+    err = MP4DuplicateErr;
+    goto bail;
+  }
+
+bail:
+  if(sampleEntryH) MP4DisposeHandle(sampleEntryH);
   TEST_RETURN(err);
   return err;
 }

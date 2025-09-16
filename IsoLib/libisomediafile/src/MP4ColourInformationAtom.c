@@ -18,7 +18,6 @@
  *
  */
 
-
 #include "MP4Atoms.h"
 #include <stdlib.h>
 #include <string.h>
@@ -61,7 +60,8 @@ static ISOErr serialize(struct MP4Atom *s, char *buffer)
     PUT16(transfer_characteristics);
     PUT16(matrix_coefficients);
   }
-  else if(self->colour_type == MP4ColorParameterTypeRICC || self->colour_type == MP4ColorParameterTypePROF)
+  else if(self->colour_type == MP4ColorParameterTypeRICC ||
+          self->colour_type == MP4ColorParameterTypePROF)
   {
     PUTBYTES(self->profile, self->profileSize);
   }
@@ -76,12 +76,11 @@ static ISOErr calculateSize(struct MP4Atom *s)
 {
   ISOErr err;
   MP4ColorInformationAtomPtr self = (MP4ColorInformationAtomPtr)s;
-  err                               = ISONoErr;
+  err                             = ISONoErr;
 
   err = MP4CalculateBaseAtomFieldSize(s);
   if(err) goto bail;
 
-  
   self->size += 4; /* colour_type */
   if(self->colour_type == MP4ColorParameterTypeNCLX)
   {
@@ -96,7 +95,8 @@ static ISOErr calculateSize(struct MP4Atom *s)
     self->size += 2; /* transfer_characteristics */
     self->size += 2; /* matrix_coefficients */
   }
-  else if(self->colour_type == MP4ColorParameterTypeRICC || self->colour_type == MP4ColorParameterTypePROF)
+  else if(self->colour_type == MP4ColorParameterTypeRICC ||
+          self->colour_type == MP4ColorParameterTypePROF)
   {
     self->size += self->profileSize;
   }
@@ -124,19 +124,21 @@ static ISOErr createFromInputStream(MP4AtomPtr s, MP4AtomPtr proto, MP4InputStre
   DEBUG_SPRINTF("colour_type = '%s'", typeString);
   self->colour_type = temp;
 
-  if (self->colour_type == MP4ColorParameterTypeNCLX || self->colour_type == QTColorParameterTypeNCLC)
+  if(self->colour_type == MP4ColorParameterTypeNCLX ||
+     self->colour_type == QTColorParameterTypeNCLC)
   {
     GET16(colour_primaries);
     GET16(transfer_characteristics);
     GET16(matrix_coefficients);
-    if (self->colour_type == MP4ColorParameterTypeNCLX)
+    if(self->colour_type == MP4ColorParameterTypeNCLX)
     {
       GET8_V_NOMSG(temp);
       self->full_range_flag = (temp & 0x80) >> 7;
       DEBUG_SPRINTF("full_range_flag = %d", self->full_range_flag);
     }
   }
-  else if(self->colour_type == MP4ColorParameterTypeRICC || self->colour_type == MP4ColorParameterTypePROF)
+  else if(self->colour_type == MP4ColorParameterTypeRICC ||
+          self->colour_type == MP4ColorParameterTypePROF)
   {
     self->profileSize = self->size - self->bytesRead;
     self->profile     = (char *)malloc(self->profileSize);

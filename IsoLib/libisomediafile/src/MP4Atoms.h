@@ -178,10 +178,10 @@ enum
 /* Colour Types */
 enum
 {
-  MP4ColorParameterTypeNCLX          = MP4_FOUR_CHAR_CODE('n', 'c', 'l', 'x'),
-  MP4ColorParameterTypeRICC          = MP4_FOUR_CHAR_CODE('r', 'I', 'C', 'C'),
-  MP4ColorParameterTypePROF          = MP4_FOUR_CHAR_CODE('p', 'r', 'o', 'f'),
-  QTColorParameterTypeNCLC           = MP4_FOUR_CHAR_CODE('n', 'c', 'l', 'c')
+  MP4ColorParameterTypeNCLX = MP4_FOUR_CHAR_CODE('n', 'c', 'l', 'x'),
+  MP4ColorParameterTypeRICC = MP4_FOUR_CHAR_CODE('r', 'I', 'C', 'C'),
+  MP4ColorParameterTypePROF = MP4_FOUR_CHAR_CODE('p', 'r', 'o', 'f'),
+  QTColorParameterTypeNCLC  = MP4_FOUR_CHAR_CODE('n', 'c', 'l', 'c')
 };
 
 #ifdef ISMACrypt

@@ -242,7 +242,7 @@ TEST_CASE("mebx")
     }
 
 
-    err = MP4SetMebxTrackReader(reader, MP4_FOUR_CHAR_CODE('r', 'e', 'd', 'd'));
+    err = MP4SetMebxTrackReaderLocalKeyId(reader, MP4_FOUR_CHAR_CODE('r', 'e', 'd', 'd'));
     CHECK(err == MP4NoErr);
     
     u32 n = 0;

@@ -593,17 +593,33 @@ static MP4Err extractMebxSamples(MP4Movie moov, const std::string& inputFile)
   err = getMebxAndVideoTrackReaders(moov, &mebxReader, nullptr);
   if (err) return err;
 
-  // TODO: select which local key to use
-  // err = ISOGetMebxMetadataCount(sampleEntryH, &key_cnt);
-  // for(u32 i = 0; i < key_cnt; i++)
-  //   err = ISOGetMebxMetadataConfig(sampleEntryH, i, &local_key_id, &key_namespace, key_value, &locale_string, setupInfo);
-  err = MP4SetMebxTrackReader(mebxReader, 1);
-  if (err) 
+  // --- Step 1.1: set key_namespace and key_value that we are looking for ---
+  u32 key_namespace = MP4_FOUR_CHAR_CODE('i', 't', '3', '5');
+  MP4Handle key_value = nullptr;
+  err = MP4NewHandle(30, &key_value);
+  if (err) return err;
+  // First 5 bytes: binary prefix according to generic definition
+  (*key_value)[0] = 0xB5;
+  (*key_value)[1] = 0x00;
+  (*key_value)[2] = 0x90;
+  (*key_value)[3] = 0x00;
+  (*key_value)[4] = 0x01;
+  // Rest: ASCII string "smpte_st_2094_50_dmcvt_v1"
+  const char dmcvStr[] = "smpte_st_2094_50_dmcvt_v1";
+  std::memcpy(&(*key_value)[5], dmcvStr, sizeof(dmcvStr) - 1);
+
+  // --- Step 1.2: select the key ---
+  u32 local_key_id = 0;
+  err = MP4SelectMebxTrackReaderKey(mebxReader, key_namespace, key_value, &local_key_id);
+  if(err) 
   {
-    std::cerr << "MP4SetMebxTrackReader failed (err=" << err << ")\n";
+    std::cerr << "MP4SelectMebxTrackReaderKey failed (err=" << err << ")\n";
+    MP4DisposeHandle(key_value);
     MP4DisposeTrackReader(mebxReader);
     return err;
   }
+  MP4DisposeHandle(key_value);
+  std::cout << "Selected local_key_id = " << local_key_id << "\n";
 
   // --- Step 2: create output folder ---
   namespace fs = std::filesystem;
@@ -638,6 +654,7 @@ static MP4Err extractMebxSamples(MP4Movie moov, const std::string& inputFile)
       if (err == MP4EOF) {
         std::cout << "Reached end of mebx samples.\n";
         err = MP4NoErr;
+        break;
       }
       return err;
     }
@@ -663,6 +680,8 @@ static MP4Err extractMebxSamples(MP4Movie moov, const std::string& inputFile)
 
     MP4DisposeHandle(sampleH);
   }
+
+  std::cout << "Extracted " << mebxSampleCount << " mebx samples.\n";
 
   MP4DisposeTrackReader(mebxReader);
   return MP4NoErr;
