@@ -705,7 +705,59 @@ static MP4Err extractMebxSamples(MP4Movie moov, const std::string& inputFile, co
   return MP4NoErr;
 }
 
-static MP4Err dumpHevcWithMebxSei(MP4Movie moov, const std::string& inputFile)
+static void writeAnnexBNAL(std::ofstream& out, const uint8_t* data, u32 size) {
+  // std::cout << "Writing NALU of size " << size << " bytes\n";
+  static const uint8_t startCode[4] = {0x00, 0x00, 0x00, 0x01};
+  out.write((const char*)startCode, 4);
+  out.write((const char*)data, size);
+}
+
+static std::vector<uint8_t> buildSeiNalu(const uint8_t* payload, u32 size, const std::string& t35PrefixHex) {
+    std::vector<uint8_t> sei;
+
+    // std::cout << "Building SEI NALU with payload size " << size << " bytes\n";
+
+    // NAL header: forbidden_zero_bit=0, nal_unit_type=39 (prefix SEI), nuh_layer_id=0, nuh_temporal_id_plus1=1
+    sei.push_back(0x00 | (39 << 1) | 0); 
+    sei.push_back(0x01);
+
+    // Build full T.35 payload = [prefix][metadata]
+    MP4Handle prefixH = nullptr;
+    if (stringToHandle(t35PrefixHex, &prefixH, STRING_TO_HANDLE_MODE) != MP4NoErr) {
+        std::cerr << "Failed to parse T.35 prefix\n";
+        return sei; // return incomplete NAL
+    }
+    u32 prefixSize = 0;
+    MP4GetHandleSize(prefixH, &prefixSize);
+
+    std::vector<uint8_t> fullPayload(prefixSize + size);
+    memcpy(fullPayload.data(), *prefixH, prefixSize);
+    memcpy(fullPayload.data() + prefixSize, payload, size);
+    MP4DisposeHandle(prefixH);
+
+    // payloadType = 4 (user_data_registered_itu_t_t35)
+    sei.push_back(4);
+
+    // payloadSize (in one byte for simplicity, assumes < 255)
+    sei.push_back((uint8_t)fullPayload.size());
+
+    // payload with emulation prevention
+    for (size_t i = 0; i < fullPayload.size(); i++) {
+        uint8_t b = fullPayload[i];
+        sei.push_back(b);
+        size_t n = sei.size();
+        if (n >= 3 && sei[n - 1] <= 0x03 && sei[n - 2] == 0x00 && sei[n - 3] == 0x00) {
+            sei.push_back(0x03);
+        }
+    }
+
+    // rbsp_trailing_bits (10000000)
+    sei.push_back(0x80);
+
+    return sei;
+}
+
+static MP4Err dumpHevcWithMebxSei(MP4Movie moov, const std::string& inputFile, const std::string& t35PrefixHex)
 {
   MP4Err err = MP4NoErr;
   MP4TrackReader mebxReader = nullptr;
@@ -750,13 +802,122 @@ static MP4Err dumpHevcWithMebxSei(MP4Movie moov, const std::string& inputFile)
   out.write((char*)*sampleEntryNALs, sampleEntryNalSize);
   std::cout << "Wrote " << sampleEntryNalSize << " bytes decoder configuration data into " << outFile << "\n";
 
+  // --- Step 4: setup mebx track reader ---
+  u32 key_namespace = MP4_FOUR_CHAR_CODE('i', 't', '3', '5');
+  MP4Handle key_value = nullptr;
+  err = stringToHandle(t35PrefixHex, &key_value, STRING_TO_HANDLE_MODE);
+  if (err) return err;
+  u32 local_key_id = 0;
+  err = MP4SelectMebxTrackReaderKey(mebxReader, key_namespace, key_value, &local_key_id);
+  if(err) 
+  {
+    std::cerr << "MP4SelectMebxTrackReaderKey failed (err=" << err << ")\n";
+    MP4DisposeHandle(key_value);
+    MP4DisposeTrackReader(mebxReader);
+    return err;
+  }
+  MP4DisposeHandle(key_value);
+  std::cout << "Selected local_key_id = " << local_key_id << "\n";
 
-  // --- Step X: iterate video samples ---
-  
-  // TODO: get video sample and associated mebx sample, write SEI NAL unit before video sample, do emulation prevention
-  // Write raw video sample to output stream
-  // replace length prefixes with start codes
+  // --- Step 5: iterate video samples and inject SEIs ---
+  u64 mebxRemain = 0;
+  MP4Handle mebxSampleH = nullptr;
+  u32 mebxSize = 0, mebxDuration = 0;
+
+  while (true) {
+    // Get next video sample
+    MP4Handle videoSampleH = nullptr;
+    u32 videoSize = 0, videoFlags = 0, videoDuration = 0;
+    s32 videoCTS = 0, videoDTS = 0;
+    err = MP4NewHandle(0, &videoSampleH);
+    if (err) break;
+
+    err = MP4TrackReaderGetNextAccessUnitWithDuration(
+              videoReader,
+              videoSampleH,
+              &videoSize,
+              &videoFlags,
+              &videoDTS,
+              &videoCTS,
+              &videoDuration);
+
+    // std::cout << "Video sample: size=" << videoSize
+    //           << " DTS=" << videoDTS
+    //           << " CTS=" << videoCTS
+    //           << " duration=" << videoDuration
+    //           << "\n";
     
+    if (err == MP4EOF) {
+      MP4DisposeHandle(videoSampleH);
+      break; // end
+    }
+    if (err) {
+      MP4DisposeHandle(videoSampleH);
+      return err;
+    }
+
+    // If no active mebx sample, fetch next one
+    if (mebxRemain == 0) {
+      if (mebxSampleH) {
+        MP4DisposeHandle(mebxSampleH);
+        mebxSampleH = nullptr;
+      }
+      err = MP4NewHandle(0, &mebxSampleH);
+      if (err) return err;
+
+      u32 mebxFlags = 0;
+      s32 mebxCTS = 0, mebxDTS = 0;
+      err = MP4TrackReaderGetNextAccessUnitWithDuration(
+                mebxReader,
+                mebxSampleH,
+                &mebxSize,
+                &mebxFlags,
+                &mebxDTS,
+                &mebxCTS,
+                &mebxDuration);
+      std::cout << "MEBX sample: size=" << mebxSize
+                << " DTS=" << mebxDTS
+                << " CTS=" << mebxCTS
+                << " duration=" << mebxDuration
+                << "\n";
+
+      if (err == MP4EOF) {
+        MP4DisposeHandle(mebxSampleH);
+        mebxSampleH = nullptr;
+        mebxSize = 0;
+      } else if (err) {
+        return err;
+      } else {
+        mebxRemain = mebxDuration;
+      }
+    }
+
+    // If active MEBX, inject SEI before video sample
+    if (mebxRemain > 0 && mebxSampleH) {
+      std::vector<uint8_t> sei = buildSeiNalu((uint8_t*)*mebxSampleH, mebxSize, t35PrefixHex);
+      writeAnnexBNAL(out, sei.data(), (u32)sei.size());
+      mebxRemain -= videoDuration;
+    }
+
+    // Write video sample (convert length-prefix -> Annex-B)
+    {
+      uint8_t* src = (uint8_t*)*videoSampleH;
+      uint8_t* end = src + videoSize;
+      while (src + length_size <= end) {
+        u32 nalLen = 0;
+        for (u32 i = 0; i < length_size; i++) {
+          nalLen = (nalLen << 8) | src[i];
+        }
+        src += length_size;
+        writeAnnexBNAL(out, src, nalLen);
+        src += nalLen;
+      }
+    }
+
+    MP4DisposeHandle(videoSampleH);
+  }
+
+  if (mebxSampleH) MP4DisposeHandle(mebxSampleH);
 
   out.close();
   std::cout << "Finished writing " << outFile << "\n";
@@ -857,7 +1018,7 @@ int main(int argc, char** argv) {
         std::cout << "Extraction completed successfully.\n";
       }
     } else if (mode == "sei") {
-      err = dumpHevcWithMebxSei(moov, inputFile);
+      err = dumpHevcWithMebxSei(moov, inputFile, t35PrefixHex);
       if (err) {
         std::cerr << "Dumping HEVC with SEI failed with err=" << err << "\n";
       } else {
