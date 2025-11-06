@@ -59,8 +59,8 @@ const float Q_GAIN_APPLICATION_OFFSET = 40000.0 / 4.0;
 const float P_MIX_PARAMS = 1.0 / 10000.0 / 2.0;
 const float Q_MIX_PARAMS = 10000.0; 
 const float Q_gainCurveControlPointX = 64000.0 / 64.0; 
-const float O_gainCurveControlPointY = 12.0; 
-const float Q_gainCurveControlPointY = 48000.0 / 24.0; 
+const float O_gainCurveControlPointY = 6.0; 
+const float Q_gainCurveControlPointY = 48000.0 / 12.0; 
 const float O_gainCurveControlPointTheta = 90.0; 
 const float Q_gainCurveControlPointTheta = 36000.0 / 180.0; 
 
@@ -77,7 +77,7 @@ const float Q_gainCurveControlPointTheta = 36000.0 / 180.0;
 // ./t35_tool 160299415_SMPTE2094-50_MetadataVideo.mov inject TestVariousMetadataType mebx
 // ./t35_tool 160299415_SMPTE2094-50_MetadataVideo.mov_mebx.mp4 extract mebx
 
-// ./t35_tool 160299415_SMPTE2094-50_MetadataVideo.mov inject ImageToneMapping mebx
+// ./t35_tool 160299415_SMPTE2094-50_MetadataVideo.mov inject ImageToneMapping mebx --t35-prefix 'B500900001:SMPTE-ST2094-50'
 // ./t35_tool 160299415_SMPTE2094-50_MetadataVideo.mov_mebx.mp4 extract mebx
 
 struct MetadataItem {
@@ -1422,10 +1422,12 @@ static MP4Err stringToHandle(const std::string& input, MP4Handle* outHandle, boo
   *outHandle = nullptr;
 
   if (asHex) {
+    /* No need to be a multiple of 2 anymore since we have descriptive label
     if (input.size() % 2 != 0) {
       std::cerr << "Invalid hex string length: " << input << "\n";
       return MP4BadParamErr;
     }
+      */
     u32 byteCount = static_cast<u32>(input.size() / 2);
     err = MP4NewHandle(byteCount, outHandle);
     if (err) return err;
@@ -1433,12 +1435,14 @@ static MP4Err stringToHandle(const std::string& input, MP4Handle* outHandle, boo
     for (u32 i = 0; i < byteCount; i++) {
       unsigned int byteVal = 0;
       std::string byteStr = input.substr(i * 2, 2);
+      /* Do not restrict value - Maybe to characters?
       if (sscanf(byteStr.c_str(), "%02x", &byteVal) != 1) {
         std::cerr << "Invalid hex substring: " << byteStr << "\n";
         MP4DisposeHandle(*outHandle);
         *outHandle = nullptr;
         return MP4BadParamErr;
       }
+        */
       (**outHandle)[i] = static_cast<u8>(byteVal);
     }
   } else {
@@ -1989,7 +1993,7 @@ int main(int argc, char** argv) {
         ->default_val("mebx")
         ->check(CLI::IsMember({"mebx", "sei"}));
   inject->add_option("--t35-prefix", t35PrefixHex, "T.35 prefix as hex string")
-        ->default_val("B500900001");
+        ->default_val("B500900001:SMPTE-ST2094-50");
 
   // Subcommand: extract
   auto extract = app.add_subcommand("extract", "Extract metadata from MP4");
@@ -1997,7 +2001,7 @@ int main(int argc, char** argv) {
          ->default_val("mebx")
          ->check(CLI::IsMember({"mebx", "sei"}));
   extract->add_option("--t35-prefix", t35PrefixHex, "T.35 prefix as hex string")
-         ->default_val("B500900001");
+         ->default_val("B500900001:SMPTE-ST2094-50");
 
   CLI11_PARSE(app, argc, argv);
 
