@@ -40,7 +40,7 @@ extern "C" {
 #include <CLI/CLI.hpp>
 #include <nlohmann/json.hpp>
 
-constexpr bool STRING_TO_HANDLE_MODE = true;   // true = hex, false = text
+constexpr bool STRING_TO_HANDLE_MODE = false;   // true = hex, false = text
 
 const float  PI_CUSTOM = 3.14159265358979323846;
 
