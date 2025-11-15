@@ -1562,7 +1562,8 @@ static MP4Err injectMetadata(MP4Movie moov,
 
 static MP4Err getMebxAndVideoTrackReaders(MP4Movie moov,
                                           MP4TrackReader* outMebxReader,
-                                          MP4TrackReader* outVideoReader)
+                                          MP4TrackReader* outVideoReader,
+                                          const std::string& t35PrefixHex)
 {
   MP4Err err = MP4NoErr;
   if (outMebxReader) *outMebxReader = nullptr;
@@ -1574,6 +1575,7 @@ static MP4Err getMebxAndVideoTrackReaders(MP4Movie moov,
 
   // --- Step 1: find mebx track ---
   MP4Track mebxTrack = nullptr;
+  MP4Track videoTrack = nullptr;
   for (u32 i = 1; i <= trackCount; ++i) 
   {
     MP4Track trak = nullptr;
@@ -1590,6 +1592,9 @@ static MP4Err getMebxAndVideoTrackReaders(MP4Movie moov,
     if (err) continue;
 
     if (handlerType != MP4MetaHandlerType) continue; // only metadata tracks
+
+    u32 currentMebxTrackID = 0;
+    MP4GetTrackID(trak, &currentMebxTrackID);
 
     // Create track reader
     MP4TrackReader reader = nullptr;
@@ -1616,42 +1621,67 @@ static MP4Err getMebxAndVideoTrackReaders(MP4Movie moov,
     MP4DisposeTrackReader(reader);
     if (err) continue;
 
-    if (type == MP4BoxedMetadataSampleEntryType) {
-      mebxTrack = trak;
-      break;
+    if (type != MP4BoxedMetadataSampleEntryType) continue;
+
+    std::cout << "Found mebx track with trackID = " << currentMebxTrackID << "\n";
+
+    // --- Step 2: create mebx reader ---
+    MP4TrackReader mebxReader = nullptr;
+    err = MP4CreateTrackReader(trak, &mebxReader);
+    if (err) return err;
+
+    // --- Step 3: find associated video track with rndr track reference type ---
+    err = MP4GetTrackReference(trak, MP4_FOUR_CHAR_CODE('r', 'n', 'd', 'r'), 1, &videoTrack);
+    if (err) {
+      std::cerr << "Mebx track ID " << currentMebxTrackID << " has no 'rndr' track reference. Skip it...\n";
+      MP4DisposeTrackReader(mebxReader);
+      continue;
     }
-  }
+
+    // --- Step 3.1: set key_namespace and key_value that we are looking for ---
+    u32 key_namespace = MP4_FOUR_CHAR_CODE('i', 't', '3', '5');
+    MP4Handle key_value = nullptr;
+    err = stringToHandle(t35PrefixHex, &key_value, STRING_TO_HANDLE_MODE);
+    if (err) return err;
+
+    // --- Step 3.2: select the key ---
+    u32 local_key_id = 0;
+    err = MP4SelectMebxTrackReaderKey(mebxReader, key_namespace, key_value, &local_key_id);
+    if(err) 
+    {
+      std::cerr << "MP4SelectMebxTrackReaderKey failed (err=" << err << ")\n";
+      MP4DisposeHandle(key_value);
+      MP4DisposeTrackReader(mebxReader);
+      continue;
+    }
+    MP4DisposeHandle(key_value);
+    std::cout << "Selected local_key_id = " << local_key_id << "\n";
+
+    // --- Step 4: create video reader if needed ---
+    u32 currentVideoTrackID = 0;
+    MP4GetTrackID(videoTrack, &currentVideoTrackID);
+    MP4TrackReader videoReader = nullptr;
+    if (outVideoReader) { // Caller wants a video reader
+      err = MP4CreateTrackReader(videoTrack, &videoReader);
+      if (err) {
+        MP4DisposeTrackReader(mebxReader);
+        return err;
+      }
+    }
+
+    if (outMebxReader) *outMebxReader = mebxReader;
+    if (outVideoReader) *outVideoReader = videoReader;
+
+    mebxTrack = trak; // It's 'mebx' with a 'rndr' reference to video
+    std::cout << "Mebx track ID = " << currentMebxTrackID
+              << " references video track ID = " << currentVideoTrackID << "\n";
+    break;
+  } // for all tracks
 
   if (!mebxTrack) {
     std::cerr << "No 'mebx' metadata track found\n";
     return MP4NotFoundErr;
   }
-
-  // --- Step 2: create mebx reader ---
-  MP4TrackReader mebxReader = nullptr;
-  err = MP4CreateTrackReader(mebxTrack, &mebxReader);
-  if (err) return err;
-
-  // --- Step 3: find associated video track ---
-  MP4Track videoTrack = nullptr;
-  err = MP4GetTrackReference(mebxTrack, MP4_FOUR_CHAR_CODE('r', 'n', 'd', 'r'), 1, &videoTrack);
-  if (err) {
-    MP4DisposeTrackReader(mebxReader);
-    return err;
-  }
-
-  // --- Step 4: create video reader ---
-  MP4TrackReader videoReader = nullptr;
-  if (outVideoReader) { // Caller wants a video reader
-    err = MP4CreateTrackReader(videoTrack, &videoReader);
-    if (err) {
-      MP4DisposeTrackReader(mebxReader);
-      return err;
-    }
-  }
-
-  if (outMebxReader) *outMebxReader = mebxReader;
-  if (outVideoReader) *outVideoReader = videoReader;
 
   return MP4NoErr;
 }
@@ -1659,33 +1689,14 @@ static MP4Err getMebxAndVideoTrackReaders(MP4Movie moov,
 
 static MP4Err extractMebxSamples(MP4Movie moov, const std::string& inputFile, const std::string& t35PrefixHex) 
 {
-  std::cout << "Extracting SMPTE 2094-50 metadata (mebx)...\n";
+  std::cout << "Extracting SMPTE 2094-50 metadata with prefix '" << t35PrefixHex << "'\n";
 
   MP4Err err = MP4NoErr;
   MP4TrackReader mebxReader = nullptr;
 
   // --- Step 1: get mebx track reader ---
-  err = getMebxAndVideoTrackReaders(moov, &mebxReader, nullptr);
+  err = getMebxAndVideoTrackReaders(moov, &mebxReader, nullptr, t35PrefixHex);
   if (err) return err;
-
-  // --- Step 1.1: set key_namespace and key_value that we are looking for ---
-  u32 key_namespace = MP4_FOUR_CHAR_CODE('i', 't', '3', '5');
-  MP4Handle key_value = nullptr;
-  err = stringToHandle(t35PrefixHex, &key_value, STRING_TO_HANDLE_MODE);
-  if (err) return err;
-
-  // --- Step 1.2: select the key ---
-  u32 local_key_id = 0;
-  err = MP4SelectMebxTrackReaderKey(mebxReader, key_namespace, key_value, &local_key_id);
-  if(err) 
-  {
-    std::cerr << "MP4SelectMebxTrackReaderKey failed (err=" << err << ")\n";
-    MP4DisposeHandle(key_value);
-    MP4DisposeTrackReader(mebxReader);
-    return err;
-  }
-  MP4DisposeHandle(key_value);
-  std::cout << "Selected local_key_id = " << local_key_id << "\n";
 
   // --- Step 2: create output folder ---
   namespace fs = std::filesystem;
@@ -1813,7 +1824,7 @@ static MP4Err dumpHevcWithMebxSei(MP4Movie moov, const std::string& inputFile, c
   MP4TrackReader videoReader = nullptr;
 
   // --- Step 1: get track readers ---
-  err = getMebxAndVideoTrackReaders(moov, &mebxReader, &videoReader);
+  err = getMebxAndVideoTrackReaders(moov, &mebxReader, &videoReader, t35PrefixHex);
   if (err) return err;
 
   // --- Step 2: get HEVC NALUs and legth_size_minus1+1 from sample entry ---
@@ -2009,7 +2020,7 @@ int main(int argc, char** argv) {
   MP4Movie moov = nullptr;
 
   // Open MP4
-  err = MP4OpenMovieFile(&moov, inputFile.c_str(), MP4OpenMovieNormal);
+  err = MP4OpenMovieFile(&moov, inputFile.c_str(), MP4OpenMovieDebug);
   if (err) {
     std::cerr << "Failed to open " << inputFile << " (err=" << err << ")\n";
     return err;
