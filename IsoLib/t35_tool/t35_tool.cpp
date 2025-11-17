@@ -28,6 +28,7 @@ extern "C" {
 }
 
 // C++ standard library headers
+#include <cstdio>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
@@ -1786,22 +1787,37 @@ static std::vector<uint8_t> buildSeiNalu(const uint8_t* payload, u32 size, const
     // std::cout << "Building SEI NALU with payload size " << size << " bytes\n";
 
     // NAL header: forbidden_zero_bit=0, nal_unit_type=39 (prefix SEI), nuh_layer_id=0, nuh_temporal_id_plus1=1
-    sei.push_back(0x00 | (39 << 1) | 0); 
+    sei.push_back(0x00 | (39 << 1) | 0);
     sei.push_back(0x01);
 
+    // Extract hex portion of t35PrefixHex (strip description after ':' if present)
+    std::string hexOnly = t35PrefixHex;
+    size_t colonPos = t35PrefixHex.find(':');
+    if (colonPos != std::string::npos) {
+        hexOnly = t35PrefixHex.substr(0, colonPos);
+    }
+
     // Build full T.35 payload = [prefix][metadata]
-    MP4Handle prefixH = nullptr;
-    if (stringToHandle(t35PrefixHex, &prefixH, STRING_TO_HANDLE_MODE) != MP4NoErr) {
-        std::cerr << "Failed to parse T.35 prefix\n";
+    // Convert hex string to binary data
+    std::vector<uint8_t> prefixBytes;
+    if (hexOnly.size() % 2 != 0) {
+        std::cerr << "Invalid hex string length in T.35 prefix (must be even): " << hexOnly << "\n";
         return sei; // return incomplete NAL
     }
-    u32 prefixSize = 0;
-    MP4GetHandleSize(prefixH, &prefixSize);
+    for (size_t i = 0; i < hexOnly.size(); i += 2) {
+        unsigned int byteVal = 0;
+        std::string byteStr = hexOnly.substr(i, 2);
+        if (sscanf(byteStr.c_str(), "%02x", &byteVal) != 1) {
+            std::cerr << "Invalid hex substring in T.35 prefix: " << byteStr << "\n";
+            return sei; // return incomplete NAL
+        }
+        prefixBytes.push_back(static_cast<uint8_t>(byteVal));
+    }
+    u32 prefixSize = static_cast<u32>(prefixBytes.size());
 
     std::vector<uint8_t> fullPayload(prefixSize + size);
-    memcpy(fullPayload.data(), *prefixH, prefixSize);
+    memcpy(fullPayload.data(), prefixBytes.data(), prefixSize);
     memcpy(fullPayload.data() + prefixSize, payload, size);
-    MP4DisposeHandle(prefixH);
 
     // payloadType = 4 (user_data_registered_itu_t_t35)
     sei.push_back(4);
