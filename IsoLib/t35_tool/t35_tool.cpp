@@ -58,11 +58,11 @@ const float P_GAIN_APPLICATION_OFFSET = 4.0 / 40000.0 / 2.0;
 const float Q_GAIN_APPLICATION_OFFSET = 40000.0 / 4.0; 
 const float P_MIX_PARAMS = 1.0 / 10000.0 / 2.0;
 const float Q_MIX_PARAMS = 10000.0; 
-const float Q_gainCurveControlPointX = 64000.0 / 64.0; 
-const float O_gainCurveControlPointY = 6.0; 
-const float Q_gainCurveControlPointY = 48000.0 / 12.0; 
-const float O_gainCurveControlPointTheta = 90.0; 
-const float Q_gainCurveControlPointTheta = 36000.0 / 180.0; 
+const float Q_GAIN_CURVE_CONTROL_POINT_X = 64000.0 / 64.0; 
+const float O_GAIN_CURVE_CONTROL_POINT_Y = 6.0; 
+const float Q_GAIN_CURVE_CONTROL_POINT_Y = 48000.0 / 12.0; 
+const float O_GAIN_CURVE_CONTROL_POINT_THETA = 90.0; 
+const float Q_GAIN_CURVE_CONTROL_POINT_THETA = 36000.0 / 180.0; 
 
 // Usage shortcuts:
 // - mkdir mybuild && cd mybuild
@@ -77,8 +77,10 @@ const float Q_gainCurveControlPointTheta = 36000.0 / 180.0;
 // ./t35_tool 160299415_SMPTE2094-50_MetadataVideo.mov inject TestVariousMetadataType mebx
 // ./t35_tool 160299415_SMPTE2094-50_MetadataVideo.mov_mebx.mp4 extract mebx
 
-// ./t35_tool 160299415_SMPTE2094-50_MetadataVideo.mov inject ImageToneMapping mebx --t35-prefix 'B500900001:SMPTE-ST2094-50'
-// ./t35_tool 160299415_SMPTE2094-50_MetadataVideo.mov_mebx.mp4 extract mebx
+// ./t35_tool 160299415_SMPTE2094-50_MetadataVideo_Duration100Percent_IMG522.mov inject ImageToneMapping mebx --t35-prefix 'B500900001:SMPTE-ST2094-50'
+// ./t35_tool 160299415_SMPTE2094-50_MetadataVideo_Duration100Percent_IMG522.mov_mebx.mp4 extract mebx
+// To verify presence of metatada track in file:
+// moovscope -dumpmebx -dumpmebxdata <filename>
 
 struct MetadataItem {
   uint32_t frame_start;
@@ -396,6 +398,12 @@ SyntaxElements convertMetadataItemsToSyntaxElements(MetadataItems itm){
 
   SyntaxElements elm;
 
+  // Init the application version:
+  elm.application_major_version = 15;
+  elm.application_minor_version = 15;
+  elm.num_windows_minus_1       = 0;
+
+
   if (abs(itm.hdrReferenceWhite - 203.0) > Q_HDR_REFERENCE_WHITE / 2) {
     elm.has_hdr_reference_white_flag = true;
     elm.hdr_reference_white = uint16_t(itm.hdrReferenceWhite * Q_HDR_REFERENCE_WHITE);
@@ -476,7 +484,7 @@ SyntaxElements convertMetadataItemsToSyntaxElements(MetadataItems itm){
       // If they do, then check if all alternate have the same x position
       for (uint16_t pIdx = 0; pIdx < itm.gainCurveNumControlPoints[0]; pIdx++){
         for (uint16_t iAlt = 1; iAlt < itm.numAlternateImages; iAlt++) {
-          if (itm.gainCurveControlPointX[0][pIdx] - itm.gainCurveControlPointX[iAlt][pIdx] > Q_gainCurveControlPointX){
+          if (itm.gainCurveControlPointX[0][pIdx] - itm.gainCurveControlPointX[iAlt][pIdx] > Q_GAIN_CURVE_CONTROL_POINT_X){
             elm.has_common_mix_params_flag = false;
             break;
           }
@@ -574,14 +582,14 @@ SyntaxElements convertMetadataItemsToSyntaxElements(MetadataItems itm){
         elm.gain_curve_interpolation[iAlt] = itm.gainCurveInterpolation[iAlt];
         elm.gain_curve_num_control_points_minus_1[iAlt] = itm.gainCurveNumControlPoints[iAlt] - 1;
         for (uint16_t iCps = 0; iCps < itm.gainCurveNumControlPoints[iAlt]; iCps++){
-          elm.gain_curve_control_points_x[iAlt][iCps] = uint16_t(itm.gainCurveControlPointX[iAlt][iCps] * Q_gainCurveControlPointX );
+          elm.gain_curve_control_points_x[iAlt][iCps] = uint16_t(itm.gainCurveControlPointX[iAlt][iCps] * Q_GAIN_CURVE_CONTROL_POINT_X );
         }
         for (uint16_t iCps = 0; iCps < itm.gainCurveNumControlPoints[iAlt]; iCps++) {
-          elm.gain_curve_control_points_y[iAlt][iCps] = uint16_t((itm.gainCurveControlPointY[iAlt][iCps]  + O_gainCurveControlPointY ) * Q_gainCurveControlPointY );
+          elm.gain_curve_control_points_y[iAlt][iCps] = uint16_t((itm.gainCurveControlPointY[iAlt][iCps]  + O_GAIN_CURVE_CONTROL_POINT_Y ) * Q_GAIN_CURVE_CONTROL_POINT_Y );
         }
         if (itm.gainCurveInterpolation[iAlt] == 2) {
           for (uint16_t iCps = 0; iCps < itm.gainCurveNumControlPoints[iAlt]; iCps++) {
-            elm.gain_curve_control_points_theta[iAlt][iCps] = uint16_t((itm.gainCurveControlPointTheta[iAlt][iCps] + O_gainCurveControlPointTheta) * Q_gainCurveControlPointTheta );
+            elm.gain_curve_control_points_theta[iAlt][iCps] = uint16_t((itm.gainCurveControlPointTheta[iAlt][iCps] + O_GAIN_CURVE_CONTROL_POINT_THETA) * Q_GAIN_CURVE_CONTROL_POINT_THETA );
           }
         }
       }
@@ -1098,10 +1106,10 @@ MetadataItems convertSyntaxElementsToMetadataItems(SyntaxElements elm){
       std::vector<float> inner_gainCurveControlPointY;
       std::vector<float> inner_gainCurveControlPointTheta;
       for (uint16_t iCps = 0; iCps < itm.gainCurveNumControlPoints[iAlt]; iCps++) {
-        inner_gainCurveControlPointX.push_back(float(elm.gain_curve_control_points_x[iAlt][iCps]) / Q_gainCurveControlPointX);
-        inner_gainCurveControlPointY.push_back(float(elm.gain_curve_control_points_y[iAlt][iCps]) / Q_gainCurveControlPointY - O_gainCurveControlPointY);
+        inner_gainCurveControlPointX.push_back(float(elm.gain_curve_control_points_x[iAlt][iCps]) / Q_GAIN_CURVE_CONTROL_POINT_X);
+        inner_gainCurveControlPointY.push_back(float(elm.gain_curve_control_points_y[iAlt][iCps]) / Q_GAIN_CURVE_CONTROL_POINT_Y - O_GAIN_CURVE_CONTROL_POINT_Y);
         if (itm.gainCurveInterpolation[iAlt] == 2) {
-          inner_gainCurveControlPointTheta.push_back(float(elm.gain_curve_control_points_theta[iAlt][iCps]) / Q_gainCurveControlPointTheta - O_gainCurveControlPointTheta);
+          inner_gainCurveControlPointTheta.push_back(float(elm.gain_curve_control_points_theta[iAlt][iCps]) / Q_GAIN_CURVE_CONTROL_POINT_THETA - O_GAIN_CURVE_CONTROL_POINT_THETA);
         }
       }
       itm.gainCurveControlPointX.push_back(inner_gainCurveControlPointX);
