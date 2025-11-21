@@ -53,6 +53,8 @@ FetchContent_MakeAvailable(cli11)
 add_executable(
   t35_tool
   t35_tool.cpp
+  SMPTE_ST2094_50.hpp
+  SMPTE_ST2094_50.cpp 
 )
 
 # Link libraries
