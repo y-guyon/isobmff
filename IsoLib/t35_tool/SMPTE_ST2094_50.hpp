@@ -90,7 +90,7 @@ struct SyntaxElements {
     bool use_reference_white_tone_mapping_flag;
     uint16_t num_alternate_images;          
     uint16_t gain_application_space_chromaticities_mode;
-    bool has_common_component_component_mixing_coefficient_flag;
+    bool has_common_mixing_coefficient_flag;
     bool has_common_curve_params_flag;
     uint16_t gain_application_space_chromaticities[MAX_NB_CHROMATICITIES];
     uint16_t  alternate_hdr_headrooms[MAX_NB_ALTERNATE];                
@@ -115,8 +115,8 @@ public:
     void convertMetadataItemsToSyntaxElements();
     void writeSyntaxElementsToBinaryData();
 
-    //void SMPTE_ST2094_50::decodeBinaryToSyntaxElements(std::vector<uint8_t> binary_data) ;
-    //void SMPTE_ST2094_50::convertSyntaxElementsToMetadataItems();
+    void decodeBinaryToSyntaxElements(std::vector<uint8_t> binary_data);
+    void convertSyntaxElementsToMetadataItems();
 
     // Getters
     std::vector<uint8_t>    getPayloadData();
