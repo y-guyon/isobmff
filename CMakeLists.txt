@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.16)
 
 project(IsoLib)
 
-option(SET_CUSTOM_OUTPUT_DIRS "Set custom output directories for artifacts" ON)
+option(SET_CUSTOM_OUTPUT_DIRS "Set custom output directories for artifacts" OFF)
 option(ISOBMFF_BUILD_LIB_ONLY "Build only libisomediafile (skip examples/tools/tests)" OFF)
 
 if(SET_CUSTOM_OUTPUT_DIRS)
