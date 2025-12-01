@@ -118,17 +118,22 @@ struct SyntaxElements {
 class SMPTE_ST2094_50 {
 public:
     SMPTE_ST2094_50(); // Constructor
-    bool decodeJsonToMetadataItems(nlohmann::json j, const std::string& path); 
+    bool decodeJsonToMetadataItems(nlohmann::json j); 
     void convertMetadataItemsToSyntaxElements();
     void writeSyntaxElementsToBinaryData();
 
     void decodeBinaryToSyntaxElements(std::vector<uint8_t> binary_data);
     void convertSyntaxElementsToMetadataItems();
+    nlohmann::json encodeMetadataItemsToJson();
 
     // Getters
     std::vector<uint8_t>    getPayloadData();
     uint32_t                getTimeIntervalStart();
     uint32_t                getTimeintervalDuration();
+
+    // Setters
+    void                    setTimeIntervalStart(uint32_t frame_start);
+    void                    setTimeintervalDuration(uint32_t frame_duration);
 
 
     void dbgPrintMetadataItems(bool decode);

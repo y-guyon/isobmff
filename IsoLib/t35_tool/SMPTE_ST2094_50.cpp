@@ -163,13 +163,19 @@ uint16_t pull_16bits(struct BinaryData *payloadBinaryData, const std::string& va
     return decValue;
 }
 
-
 /* *********************************** SMPTE ST 2094-50 FUNCTIONS *******************************************************************************************/
 // Constructors
 SMPTE_ST2094_50::SMPTE_ST2094_50(){
     keyValue = "B500900001:SMPTE-ST2094-50";
-    // Init the application version:
-    elm.application_version = 0;
+
+    // Application - fixed
+    applicationIdentifier = 5;
+    applicationVersion    = 255;
+
+    // ProcessingWindow - fixed
+    pWin.upperLeftCorner  = 0;
+    pWin.lowerRightCorner = 0;
+    pWin.windowNumber     = 1;
 
     // Initialize convenience flags
     isHeadroomAdaptiveToneMap = false;
@@ -185,144 +191,137 @@ std::vector<uint8_t>    SMPTE_ST2094_50::getPayloadData(){return payloadBinaryDa
 uint32_t                SMPTE_ST2094_50::getTimeIntervalStart(){return timeI.timeIntervalStart;}
 uint32_t                SMPTE_ST2094_50::getTimeintervalDuration(){return timeI.timeintervalDuration;}
 
-// Methods 
+// Setters
+void                    SMPTE_ST2094_50::setTimeIntervalStart(uint32_t frame_start){timeI.timeIntervalStart = frame_start;}
+void                    SMPTE_ST2094_50::setTimeintervalDuration(uint32_t frame_duration){timeI.timeintervalDuration = frame_duration;}
 
 /* *********************************** ENCODING SECTION ********************************************************************************************/
 // Read from json file the metadata items
-bool SMPTE_ST2094_50::decodeJsonToMetadataItems(nlohmann::json j, const std::string& path) {
+bool SMPTE_ST2094_50::decodeJsonToMetadataItems(nlohmann::json j) {
 bool error_raised = false;
-  std::cout << "++++++++++++++++++++++ DECODE JSON TO METADATA ITEMS **++++++++++++++++++++++++++++++*********************************************]\n";
-  // MetadataItems
- applicationIdentifier = 5;
- applicationVersion    = 255;
+std::cout << "++++++++++++++++++++++ DECODE JSON TO METADATA ITEMS **++++++++++++++++++++++++++++++*********************************************]\n";
 
-  // TimeInterval
-  if (j.contains("frame_start") && j.contains("frame_duration")) {
-   timeI.timeIntervalStart     = j["frame_start"].get<uint32_t>();
-   timeI.timeintervalDuration  =  j["frame_duration"].get<uint32_t>();
-  } else{
-    // If not present attach it to only the first frame
-    std::cerr << "JSON Decode: missing optional keys: frame_start | frame_duration\n";
-   timeI.timeIntervalStart     = 0;
-   timeI.timeintervalDuration  = 1;
+// TimeInterval
+if (j.contains("frame_start") && j.contains("frame_duration")) {
+  setTimeIntervalStart(j["frame_start"].get<uint32_t>());
+  setTimeintervalDuration(j["frame_duration"].get<uint32_t>());
+} else{
+  // If not present attach it to only the first frame
+  std::cerr << "JSON Decode: missing optional keys: frame_start | frame_duration\n";
+}
+
+// Checking mandatory metadata
+if (!j.contains("hdrReferenceWhite") ) {
+  std::cerr <<  "missing mandatory keys: hdrReferenceWhite\n";
+    return error_raised;
+}
+
+// ================================================= Decode Metadata Items ===================================
+// get mandatory metadata
+cvt.hdrReferenceWhite       = j["hdrReferenceWhite"].get<float>();
+if (j.contains("baselineHdrHeadroom") )
+{
+  isHeadroomAdaptiveToneMap    = true; // if there is a baselineHdrHeadroom then it is a headroom adaptive tone mapping
+  cvt.hatm.baselineHdrHeadroom = j["baselineHdrHeadroom"].get<float>();
+
+  if (!j.contains("numAlternateImages") || !j.contains("gainApplicationSpaceChromaticities") ){ // Derived Headroom Adaptive Tone Mapping parameters based on baselineHdrHeadroom
+    isReferenceWhiteToneMapping  = true;
   }
-
-  // ProcessingWindow - fixed
- pWin.upperLeftCorner  = 0;
- pWin.lowerRightCorner = 0;
- pWin.windowNumber     = 1;
-
-  // Checking mandatory metadata
-  if (!j.contains("hdrReferenceWhite") ) {
-    std::cerr <<  "missing mandatory keys: hdrReferenceWhite\n";
-     return error_raised;
-  }
-
-  // ================================================= Decode Metadata Items ===================================
-  // get mandatory metadata
- cvt.hdrReferenceWhite       = j["hdrReferenceWhite"].get<float>();
-  if (j.contains("baselineHdrHeadroom") )
+  else // Custom Headroom Adaptive Tone Mapping mode
   {
-   isHeadroomAdaptiveToneMap    = true; // if there is a baselineHdrHeadroom then it is a headroom adaptive tone mapping
-   cvt.hatm.baselineHdrHeadroom = j["baselineHdrHeadroom"].get<float>();
+    cvt.hatm.numAlternateImages                 = j["numAlternateImages"].get<uint32_t>();
 
-    if (!j.contains("numAlternateImages") || !j.contains("gainApplicationSpaceChromaticities") ){ // Derived Headroom Adaptive Tone Mapping parameters based on baselineHdrHeadroom
-     isReferenceWhiteToneMapping  = true;
+    std::vector<float> gainApplicationSpaceChromaticities = j["gainApplicationSpaceChromaticities"].get<std::vector<float>>();
+    if (gainApplicationSpaceChromaticities.size() != MAX_NB_CHROMATICITIES){ error_raised = true; std::cerr <<  "JSON Decode: size of gainApplicationSpaceChromaticities != 8\n"; }
+    for (int iCh = 0; iCh < MAX_NB_CHROMATICITIES; iCh++) {
+      cvt.hatm.gainApplicationSpaceChromaticities[iCh] =  gainApplicationSpaceChromaticities[iCh];
     }
-    else // Custom Headroom Adaptive Tone Mapping mode
-    {
-     cvt.hatm.numAlternateImages                 = j["numAlternateImages"].get<uint32_t>();
+    
+    if (cvt.hatm.numAlternateImages > 0) { // if no alternat then there is no more netadata
+      if (!j.contains("alternateHdrHeadroom"))     { error_raised = true; std::cerr << "JSON Decode: alternateHdrHeadroom metadata item missing\n"     ; return error_raised;}
 
-      std::vector<float> gainApplicationSpaceChromaticities = j["gainApplicationSpaceChromaticities"].get<std::vector<float>>();
-      if (gainApplicationSpaceChromaticities.size() != MAX_NB_CHROMATICITIES){ error_raised = true; std::cerr <<  "JSON Decode: size of gainApplicationSpaceChromaticities != 8\n"; }
-      for (int iCh = 0; iCh < MAX_NB_CHROMATICITIES; iCh++) {
-       cvt.hatm.gainApplicationSpaceChromaticities[iCh] =  gainApplicationSpaceChromaticities[iCh];
-      }
+      if (!j.contains("componentMixRed"))          { error_raised = true; std::cerr << "JSON Decode: componentMixRed metadata item missing\n"          ; return error_raised;}
+      if (!j.contains("componentMixGreen"))        { error_raised = true; std::cerr << "JSON Decode: componentMixGreen metadata item missing\n"        ; return error_raised;}
+      if (!j.contains("componentMixBlue"))         { error_raised = true; std::cerr << "JSON Decode: componentMixBlue metadata item missing\n"         ; return error_raised;}
+      if (!j.contains("componentMixMax"))          { error_raised = true; std::cerr << "JSON Decode: componentMixMax metadata item missing\n"          ; return error_raised;}
+      if (!j.contains("componentMixMin"))          { error_raised = true; std::cerr << "JSON Decode: componentMixMin metadata item missing\n"          ; return error_raised;}
+      if (!j.contains("componentMixComponent"))    { error_raised = true; std::cerr << "JSON Decode: componentMixComponent metadata item missing\n"    ; return error_raised;}
+
+      if (!j.contains("gainCurveNumControlPoints")){ error_raised = true; std::cerr << "JSON Decode: gainCurveNumControlPoints metadata item missing\n"; return error_raised;}
+      if (!j.contains("gainCurveControlPointX"))   { error_raised = true; std::cerr << "JSON Decode: gainCurveControlPointX metadata item missing\n"   ; return error_raised;}
+      if (!j.contains("gainCurveControlPointY"))   { error_raised = true; std::cerr << "JSON Decode: gainCurveControlPointY metadata item missing\n"   ; return error_raised;}
       
-      if (cvt.hatm.numAlternateImages > 0) { // if no alternat then there is no more netadata
-        if (!j.contains("alternateHdrHeadroom"))     { error_raised = true; std::cerr << "JSON Decode: alternateHdrHeadroom metadata item missing\n"     ; return error_raised;}
+      // Decode headroom adaptive metadata
+      std::vector<float> alternateHdrHeadroom  = j["alternateHdrHeadroom"].get<std::vector<float>>();
+      std::vector<float> componentMixRed       = j["componentMixRed"].get<std::vector<float>>();
+      std::vector<float> componentMixGreen     = j["componentMixGreen"].get<std::vector<float>>();
+      std::vector<float> componentMixBlue      = j["componentMixBlue"].get<std::vector<float>>();
+      std::vector<float> componentMixMax       = j["componentMixMax"].get<std::vector<float>>();
+      std::vector<float> componentMixMin       = j["componentMixMin"].get<std::vector<float>>();
+      std::vector<float> componentMixComponent = j["componentMixComponent"].get<std::vector<float>>();
 
-        if (!j.contains("componentMixRed"))          { error_raised = true; std::cerr << "JSON Decode: componentMixRed metadata item missing\n"          ; return error_raised;}
-        if (!j.contains("componentMixGreen"))        { error_raised = true; std::cerr << "JSON Decode: componentMixGreen metadata item missing\n"        ; return error_raised;}
-        if (!j.contains("componentMixBlue"))         { error_raised = true; std::cerr << "JSON Decode: componentMixBlue metadata item missing\n"         ; return error_raised;}
-        if (!j.contains("componentMixMax"))          { error_raised = true; std::cerr << "JSON Decode: componentMixMax metadata item missing\n"          ; return error_raised;}
-        if (!j.contains("componentMixMin"))          { error_raised = true; std::cerr << "JSON Decode: componentMixMin metadata item missing\n"          ; return error_raised;}
-        if (!j.contains("componentMixComponent"))    { error_raised = true; std::cerr << "JSON Decode: componentMixComponent metadata item missing\n"    ; return error_raised;}
+      std::vector<uint32_t>           gainCurveNumControlPoints = j["gainCurveNumControlPoints"].get<std::vector<uint32_t>>();
+      std::vector<std::vector<float>> gainCurveControlPointX    = j["gainCurveControlPointX"].get<std::vector<std::vector<float>>>();
+      std::vector<std::vector<float>> gainCurveControlPointY    = j["gainCurveControlPointY"].get<std::vector<std::vector<float>>>();
 
-        if (!j.contains("gainCurveNumControlPoints")){ error_raised = true; std::cerr << "JSON Decode: gainCurveNumControlPoints metadata item missing\n"; return error_raised;}
-        if (!j.contains("gainCurveControlPointX"))   { error_raised = true; std::cerr << "JSON Decode: gainCurveControlPointX metadata item missing\n"   ; return error_raised;}
-        if (!j.contains("gainCurveControlPointY"))   { error_raised = true; std::cerr << "JSON Decode: gainCurveControlPointY metadata item missing\n"   ; return error_raised;}
+      // Check the size of outter element
+      if (alternateHdrHeadroom.size()      <cvt.hatm.numAlternateImages){ error_raised = true; std::cerr << "JSON Decode: size of alternateHdrHeadroom < numAlternateImages\n";  return error_raised;}
+      if (componentMixRed.size()           <cvt.hatm.numAlternateImages){ error_raised = true; std::cerr << "JSON Decode: size of componentMixRed < numAlternateImages\n"; return error_raised;}
+      if (componentMixGreen.size()         <cvt.hatm.numAlternateImages){ error_raised = true; std::cerr << "JSON Decode: size of componentMixGreen < numAlternateImages\n"; return error_raised;}
+      if (componentMixBlue.size()          <cvt.hatm.numAlternateImages){ error_raised = true; std::cerr << "JSON Decode: size of componentMixBlue < numAlternateImages\n"; return error_raised;}
+      if (componentMixMax.size()           <cvt.hatm.numAlternateImages){ error_raised = true; std::cerr << "JSON Decode: size of componentMixMax < numAlternateImages\n"; return error_raised;}
+      if (componentMixMin.size()           <cvt.hatm.numAlternateImages){ error_raised = true; std::cerr << "JSON Decode: size of componentMixMin < numAlternateImages\n"; return error_raised;}
+      if (componentMixComponent.size()     <cvt.hatm.numAlternateImages){ error_raised = true; std::cerr << "JSON Decode: size of componentMixComponent < numAlternateImages\n"; return error_raised;}
+      if (gainCurveNumControlPoints.size() <cvt.hatm.numAlternateImages){ error_raised = true; std::cerr << "JSON Decode: size of gainCurveNumControlPoints < numAlternateImages\n"; return error_raised;}
+      if (gainCurveControlPointX.size()    <cvt.hatm.numAlternateImages){ error_raised = true; std::cerr << "JSON Decode: size of gainCurveControlPointX < numAlternateImages\n"; return error_raised;}
+      if (gainCurveControlPointY.size()    <cvt.hatm.numAlternateImages){ error_raised = true; std::cerr << "JSON Decode: size of gainCurveControlPointY < numAlternateImages\n"; return error_raised;}
+
+      std::vector<std::vector<float>> gainCurveControlPointTheta;
+      if (j.contains("gainCurveControlPointTheta")) {
+        for (uint16_t iAlt = 0; iAlt <cvt.hatm.numAlternateImages; iAlt++) {hasSlopeParameter[iAlt] = true; } // [Todo: within the json there could be only some alternates that have the slope. How to manage this case. For now assume they all have it or not]
+        gainCurveControlPointTheta = j["gainCurveControlPointTheta"].get<std::vector<std::vector<float>>>();
+        if (gainCurveControlPointTheta.size()    <cvt.hatm.numAlternateImages){ error_raised = true; std::cerr << "JSON Decode: size of gainCurveControlPointTheta < numAlternateImages\n"; return error_raised;}
+      }
+
+      // Color Gain Function 
+      for (uint16_t iAlt = 0; iAlt <cvt.hatm.numAlternateImages; iAlt++) {
+        cvt.hatm.alternateHdrHeadroom.push_back(alternateHdrHeadroom[iAlt]);
+
+        ColorGainFunction cgf; 
+        cgf.cm.componentMixRed       = componentMixRed[iAlt];
+        cgf.cm.componentMixGreen     = componentMixGreen[iAlt];
+        cgf.cm.componentMixBlue      = componentMixBlue[iAlt];
+        cgf.cm.componentMixMax       = componentMixMax[iAlt];
+        cgf.cm.componentMixMin       = componentMixMin[iAlt];
+        cgf.cm.componentMixComponent = componentMixComponent[iAlt];
+
+        // Gain Curve metadata
+        cgf.gc.gainCurveNumControlPoints = gainCurveNumControlPoints[iAlt];
         
-        // Decode headroom adaptive metadata
-        std::vector<float> alternateHdrHeadroom  = j["alternateHdrHeadroom"].get<std::vector<float>>();
-        std::vector<float> componentMixRed       = j["componentMixRed"].get<std::vector<float>>();
-        std::vector<float> componentMixGreen     = j["componentMixGreen"].get<std::vector<float>>();
-        std::vector<float> componentMixBlue      = j["componentMixBlue"].get<std::vector<float>>();
-        std::vector<float> componentMixMax       = j["componentMixMax"].get<std::vector<float>>();
-        std::vector<float> componentMixMin       = j["componentMixMin"].get<std::vector<float>>();
-        std::vector<float> componentMixComponent = j["componentMixComponent"].get<std::vector<float>>();
-
-        std::vector<uint32_t>           gainCurveNumControlPoints = j["gainCurveNumControlPoints"].get<std::vector<uint32_t>>();
-        std::vector<std::vector<float>> gainCurveControlPointX    = j["gainCurveControlPointX"].get<std::vector<std::vector<float>>>();
-        std::vector<std::vector<float>> gainCurveControlPointY    = j["gainCurveControlPointY"].get<std::vector<std::vector<float>>>();
-
         // Check the size of outter element
-        if (alternateHdrHeadroom.size()      <cvt.hatm.numAlternateImages){ error_raised = true; std::cerr << "JSON Decode: size of alternateHdrHeadroom < numAlternateImages\n";  return error_raised;}
-        if (componentMixRed.size()           <cvt.hatm.numAlternateImages){ error_raised = true; std::cerr << "JSON Decode: size of componentMixRed < numAlternateImages\n"; return error_raised;}
-        if (componentMixGreen.size()         <cvt.hatm.numAlternateImages){ error_raised = true; std::cerr << "JSON Decode: size of componentMixGreen < numAlternateImages\n"; return error_raised;}
-        if (componentMixBlue.size()          <cvt.hatm.numAlternateImages){ error_raised = true; std::cerr << "JSON Decode: size of componentMixBlue < numAlternateImages\n"; return error_raised;}
-        if (componentMixMax.size()           <cvt.hatm.numAlternateImages){ error_raised = true; std::cerr << "JSON Decode: size of componentMixMax < numAlternateImages\n"; return error_raised;}
-        if (componentMixMin.size()           <cvt.hatm.numAlternateImages){ error_raised = true; std::cerr << "JSON Decode: size of componentMixMin < numAlternateImages\n"; return error_raised;}
-        if (componentMixComponent.size()     <cvt.hatm.numAlternateImages){ error_raised = true; std::cerr << "JSON Decode: size of componentMixComponent < numAlternateImages\n"; return error_raised;}
-        if (gainCurveNumControlPoints.size() <cvt.hatm.numAlternateImages){ error_raised = true; std::cerr << "JSON Decode: size of gainCurveNumControlPoints < numAlternateImages\n"; return error_raised;}
-        if (gainCurveControlPointX.size()    <cvt.hatm.numAlternateImages){ error_raised = true; std::cerr << "JSON Decode: size of gainCurveControlPointX < numAlternateImages\n"; return error_raised;}
-        if (gainCurveControlPointY.size()    <cvt.hatm.numAlternateImages){ error_raised = true; std::cerr << "JSON Decode: size of gainCurveControlPointY < numAlternateImages\n"; return error_raised;}
-
-        std::vector<std::vector<float>> gainCurveControlPointTheta;
-        if (j.contains("gainCurveControlPointTheta")) {
-          for (uint16_t iAlt = 0; iAlt <cvt.hatm.numAlternateImages; iAlt++) {hasSlopeParameter[iAlt] = true; } // [Todo: within the json there could be only some alternates that have the slope. How to manage this case. For now assume they all have it or not]
-          gainCurveControlPointTheta = j["gainCurveControlPointTheta"].get<std::vector<std::vector<float>>>();
-          if (gainCurveControlPointTheta.size()    <cvt.hatm.numAlternateImages){ error_raised = true; std::cerr << "JSON Decode: size of gainCurveControlPointTheta < numAlternateImages\n"; return error_raised;}
+        if (gainCurveControlPointX[iAlt].size() < gainCurveNumControlPoints[iAlt]){ error_raised = true; std::cerr << "JSON Decode: size of gainCurveControlPointX[a] < gainCurveNumControlPoints\n"; return error_raised;}
+        if (gainCurveControlPointY[iAlt].size() < gainCurveNumControlPoints[iAlt]){ error_raised = true; std::cerr << "JSON Decode: size of gainCurveControlPointX[a] < gainCurveNumControlPoints\n"; return error_raised;}
+        for (uint16_t iCp = 0; iCp < gainCurveNumControlPoints[iAlt]; iCp++) {
+          cgf.gc.gainCurveControlPointX.push_back(gainCurveControlPointX[iAlt][iCp]);
+          cgf.gc.gainCurveControlPointY.push_back(gainCurveControlPointY[iAlt][iCp]);
         }
-
-        // Color Gain Function 
-        for (uint16_t iAlt = 0; iAlt <cvt.hatm.numAlternateImages; iAlt++) {
-         cvt.hatm.alternateHdrHeadroom.push_back(alternateHdrHeadroom[iAlt]);
-
-          ColorGainFunction cgf; 
-          cgf.cm.componentMixRed       = componentMixRed[iAlt];
-          cgf.cm.componentMixGreen     = componentMixGreen[iAlt];
-          cgf.cm.componentMixBlue      = componentMixBlue[iAlt];
-          cgf.cm.componentMixMax       = componentMixMax[iAlt];
-          cgf.cm.componentMixMin       = componentMixMin[iAlt];
-          cgf.cm.componentMixComponent = componentMixComponent[iAlt];
-
-          // Gain Curve metadata
-          cgf.gc.gainCurveNumControlPoints = gainCurveNumControlPoints[iAlt];
-          
-          // Check the size of outter element
-          if (gainCurveControlPointX[iAlt].size() < gainCurveNumControlPoints[iAlt]){ error_raised = true; std::cerr << "JSON Decode: size of gainCurveControlPointX[a] < gainCurveNumControlPoints\n"; return error_raised;}
-          if (gainCurveControlPointY[iAlt].size() < gainCurveNumControlPoints[iAlt]){ error_raised = true; std::cerr << "JSON Decode: size of gainCurveControlPointX[a] < gainCurveNumControlPoints\n"; return error_raised;}
+        if (hasSlopeParameter[iAlt]) {
+          if (gainCurveControlPointTheta[iAlt].size() < gainCurveNumControlPoints[iAlt]){ error_raised = true; std::cerr << "JSON Decode: size of gainCurveControlPointTheta[a] < gainCurveNumControlPoints\n"; return error_raised;}
           for (uint16_t iCp = 0; iCp < gainCurveNumControlPoints[iAlt]; iCp++) {
-            cgf.gc.gainCurveControlPointX.push_back(gainCurveControlPointX[iAlt][iCp]);
-            cgf.gc.gainCurveControlPointY.push_back(gainCurveControlPointY[iAlt][iCp]);
+            cgf.gc.gainCurveControlPointTheta.push_back(gainCurveControlPointTheta[iAlt][iCp]);
           }
-          if (hasSlopeParameter[iAlt]) {
-            if (gainCurveControlPointTheta[iAlt].size() < gainCurveNumControlPoints[iAlt]){ error_raised = true; std::cerr << "JSON Decode: size of gainCurveControlPointTheta[a] < gainCurveNumControlPoints\n"; return error_raised;}
-            for (uint16_t iCp = 0; iCp < gainCurveNumControlPoints[iAlt]; iCp++) {
-              cgf.gc.gainCurveControlPointTheta.push_back(gainCurveControlPointTheta[iAlt][iCp]);
-            }
-          }
-         cvt.hatm.cgf.push_back(cgf);
         }
+        cvt.hatm.cgf.push_back(cgf);
       }
     }
   }
+}
 return error_raised;
 }
 
 // Convert metadata items to syntax elements 
 void SMPTE_ST2094_50::convertMetadataItemsToSyntaxElements(){
+  elm.has_custom_hdr_reference_white_flag = false;
   if (abs(cvt.hdrReferenceWhite - 203.0) > Q_HDR_REFERENCE_WHITE / 2) {
     elm.has_custom_hdr_reference_white_flag = true;
     elm.hdr_reference_white = uint16_t(cvt.hdrReferenceWhite * Q_HDR_REFERENCE_WHITE);
@@ -387,6 +386,7 @@ void SMPTE_ST2094_50::convertMetadataItemsToSyntaxElements(){
           break;
         }
       } 
+
       // Check if all alternate have the same number of control points and interpolation
       elm.has_common_curve_params_flag = true;  // Init at true, any mismatch makes it false
       for (uint16_t iAlt = 1; iAlt < cvt.hatm.numAlternateImages; iAlt++) {
@@ -423,7 +423,7 @@ void SMPTE_ST2094_50::convertMetadataItemsToSyntaxElements(){
           abs(cvt.hatm.cgf[iAlt].cm.componentMixMax- 1.0 ) < P_COMPONENT_MIXING_COEFFICIENT &&
           abs(cvt.hatm.cgf[iAlt].cm.componentMixMin      ) < P_COMPONENT_MIXING_COEFFICIENT &&
           abs(cvt.hatm.cgf[iAlt].cm.componentMixComponent) < P_COMPONENT_MIXING_COEFFICIENT){ 
-            elm.component_mixing_type[iAlt] = 0;
+          elm.component_mixing_type[iAlt] = 0; dbgPrintMilestones(426, "MaxRGB", cvt.hatm.cgf[iAlt].cm.componentMixMax);
         } else if (
           abs(cvt.hatm.cgf[iAlt].cm.componentMixRed      ) < P_COMPONENT_MIXING_COEFFICIENT &&
           abs(cvt.hatm.cgf[iAlt].cm.componentMixGreen    ) < P_COMPONENT_MIXING_COEFFICIENT &&
@@ -431,7 +431,7 @@ void SMPTE_ST2094_50::convertMetadataItemsToSyntaxElements(){
           abs(cvt.hatm.cgf[iAlt].cm.componentMixMax      ) < P_COMPONENT_MIXING_COEFFICIENT &&
           abs(cvt.hatm.cgf[iAlt].cm.componentMixMin      ) < P_COMPONENT_MIXING_COEFFICIENT &&
           abs(cvt.hatm.cgf[iAlt].cm.componentMixComponent - 1.0 ) < P_COMPONENT_MIXING_COEFFICIENT){ 
-            elm.component_mixing_type[iAlt] = 1;
+          elm.component_mixing_type[iAlt] = 1; dbgPrintMilestones(434, "Cmp", cvt.hatm.cgf[iAlt].cm.componentMixComponent);
         }  else if (
           abs(cvt.hatm.cgf[iAlt].cm.componentMixRed   - (1.0 / 6.0)) < P_COMPONENT_MIXING_COEFFICIENT &&
           abs(cvt.hatm.cgf[iAlt].cm.componentMixGreen - (1.0 / 6.0)) < P_COMPONENT_MIXING_COEFFICIENT &&
@@ -439,8 +439,9 @@ void SMPTE_ST2094_50::convertMetadataItemsToSyntaxElements(){
           abs(cvt.hatm.cgf[iAlt].cm.componentMixMax   - (1.0 / 2.0)) < P_COMPONENT_MIXING_COEFFICIENT &&
           abs(cvt.hatm.cgf[iAlt].cm.componentMixMin      ) < P_COMPONENT_MIXING_COEFFICIENT &&
           abs(cvt.hatm.cgf[iAlt].cm.componentMixComponent) < P_COMPONENT_MIXING_COEFFICIENT){ 
-            elm.component_mixing_type[iAlt] = 2;
+          elm.component_mixing_type[iAlt] = 2; dbgPrintMilestones(442, "LumaA", cvt.hatm.cgf[iAlt].cm.componentMixRed);
         } else { // Send flag to true for each non-zero coefficient
+          elm.component_mixing_type[iAlt] = 3; dbgPrintMilestones(444, "Custom", cvt.hatm.cgf[iAlt].cm.componentMixMax);
           uint16_t iCmf = 0;
           // 
           elm.component_mixing_coefficient[iAlt][iCmf] = uint16_t(cvt.hatm.cgf[iAlt].cm.componentMixRed       * Q_COMPONENT_MIXING_COEFFICIENT); iCmf++;
@@ -483,7 +484,6 @@ void SMPTE_ST2094_50::convertMetadataItemsToSyntaxElements(){
 // Convert syntax element to finary data and write to file
 void SMPTE_ST2094_50::writeSyntaxElementsToBinaryData(){
 // ================================================= Convert binary data from Syntax Elements ===================================
-uint8_t value_8; 
 // Initialize the binary payload structure
 payloadBinaryData.byteIdx = 0;
 payloadBinaryData.bitIdx  = 0;
@@ -518,7 +518,7 @@ if (elm.has_adaptive_tone_map_flag) {
             push_16bits(&payloadBinaryData, elm.alternate_hdr_headrooms[iAlt], "alternate_hdr_headrooms[iAlt]");
             // Write component mixing function parameters
             if ( iAlt == 0 || !elm.has_common_mixing_coefficient_flag){
-                push_bits(&payloadBinaryData, uint8_t(elm.component_mixing_type[iAlt]>> 8), 2, "component_mixing_type[iAlt]");
+                push_bits(&payloadBinaryData, uint8_t(elm.component_mixing_type[iAlt]), 2, "component_mixing_type[iAlt]");
                 if (elm.component_mixing_type[iAlt] == 3) {
                     // Write the flag to indicate which coefficients are signaled 
                     uint8_t value_8 = 0;
@@ -576,12 +576,9 @@ void SMPTE_ST2094_50::decodeBinaryToSyntaxElements(std::vector<uint8_t> binary_d
   // Initialize the binary payload structure
   payloadBinaryData.byteIdx = 0;
   payloadBinaryData.bitIdx  = 0;
-  for (int i = 0; i < binary_data.size(); i++) {
+  for (int i = 0; i < int(binary_data.size()); i++) {
       payloadBinaryData.payload.push_back(binary_data[i]);
-      std::string result = "Byte[" + std::to_string(i) + "]= ";
-      printDebug(result, uint16_t(binary_data[i]), 8);
-      //std::cout << "Byte[" << i << "] = " << uint16_t(binary_data[i]) << std::endl;
-      //std::cout << std::hex << std::uppercase <<  binary_data[i] << std::endl;
+      printDebug("Byte[" + std::to_string(i) + "]= ", uint16_t(binary_data[i]), 8);
   }
 
   std::cout << "++++++++++++++++++++++Syntax Elements Decoding ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\n"; 
@@ -675,7 +672,7 @@ std::cout << "++++++++++++++++++++++++++++++Syntax Elements Successfully Decodin
 
 // Convert the syntax elements to Metadata Items as described in Clause C.3
 void SMPTE_ST2094_50::convertSyntaxElementsToMetadataItems(){
-  bool error_raised = false;
+
   // get mandatory metadata
   if (elm.has_custom_hdr_reference_white_flag) {
     cvt.hdrReferenceWhite = float(elm.hdr_reference_white) / Q_HDR_REFERENCE_WHITE;
@@ -685,158 +682,230 @@ void SMPTE_ST2094_50::convertSyntaxElementsToMetadataItems(){
 
   // Get Optional metadata items
   if (elm.has_adaptive_tone_map_flag) {
+    isHeadroomAdaptiveToneMap = true;
     HeadroomAdaptiveToneMap hatm;
     cvt.hatm.baselineHdrHeadroom = float(elm.baseline_hdr_headroom) / Q_HDR_HEADROOM;
     if (elm.use_reference_white_tone_mapping_flag) {
-        cvt.hatm.numAlternateImages = 2;
-        // BT.2020 primaries
+      isReferenceWhiteToneMapping = true;
+      cvt.hatm.numAlternateImages = 2;
+      // BT.2020 primaries
+      cvt.hatm.gainApplicationSpaceChromaticities[0] = 0.708;
+      cvt.hatm.gainApplicationSpaceChromaticities[1] = 0.292;
+      cvt.hatm.gainApplicationSpaceChromaticities[2] = 0.17 ;
+      cvt.hatm.gainApplicationSpaceChromaticities[3] = 0.797;
+      cvt.hatm.gainApplicationSpaceChromaticities[4] = 0.131;
+      cvt.hatm.gainApplicationSpaceChromaticities[5] = 0.046;
+      cvt.hatm.gainApplicationSpaceChromaticities[6] = 0.3127;
+      cvt.hatm.gainApplicationSpaceChromaticities[7] = 0.3290;
+      // Compute alternate headroom
+      cvt.hatm.alternateHdrHeadroom.push_back(0.0);
+      float headroom_to_anchor_ratio = std::min(cvt.hatm.baselineHdrHeadroom / log2(1000.0/203.0), 1.0);
+      float h_alt_1 = log2(8.0/3.0) * headroom_to_anchor_ratio;
+      cvt.hatm.alternateHdrHeadroom.push_back(h_alt_1);
+  
+      // Constant parameter across alternate images
+      float kappa  = 0.65;
+      float x_knee = 1;
+      float x_max  = pow(2.0, cvt.hatm.baselineHdrHeadroom);
+      for (uint16_t iAlt = 0;  iAlt  < cvt.hatm.numAlternateImages; iAlt++){
+        isLinearInterpolation[iAlt] = false;
+        hasSlopeParameter[iAlt]     = true;
+        // Component mixing is maxRGB
+        ColorGainFunction cgf;
+        cgf.cm.componentMixRed = 0.0;
+        cgf.cm.componentMixGreen = 0.0;
+        cgf.cm.componentMixBlue = 0.0;
+        cgf.cm.componentMixMax = 1.0;
+        cgf.cm.componentMixMin = 0.0;
+        cgf.cm.componentMixComponent = 0.0; 
+        cgf.gc.gainCurveNumControlPoints = 8;
+  
+        // Inner vector for push_back
+        std::vector<float> inner_gainCurveControlPointX;
+        std::vector<float> inner_gainCurveControlPointY;
+        std::vector<float> inner_gainCurveControlPointTheta;
+  
+        // Compute the control points parameter depending on the alternate headroom
+        float  y_white = 1.0;
+        if (iAlt == 0) {
+          y_white = 1 - (0.5 * headroom_to_anchor_ratio );
+        }
+        float y_knee = y_white;
+        float y_max  = pow(2.0, cvt.hatm.alternateHdrHeadroom[iAlt]);
+        float x_mid = (1.0 - kappa) * x_knee + kappa * (x_knee * y_max / y_knee);
+        float y_mid = (1.0 - kappa) * y_knee + kappa * y_max;
+        // Compute Quadratic Beziers coefficients
+        float a_x = x_knee - 2 * x_mid + x_max;
+        float a_y = y_knee - 2 * y_mid + y_max;
+        float b_x = 2 * x_mid - 2 * x_knee;
+        float b_y = 2 * y_mid - 2 * y_knee;
+        float c_x = x_knee;
+        float c_y = y_knee;
+  
+        for (uint16_t iCps = 0; iCps < cgf.gc.gainCurveNumControlPoints; iCps++) {
+          // Compute the control points
+          float t = float(iCps) / (float(cgf.gc.gainCurveNumControlPoints) - 1.0);
+          float t_square = t * t;
+          float x = a_x * t_square + b_x * t + c_x;
+          float y = a_y * t_square + b_y * t + c_y;
+          float m = (2.0 * a_y * t + b_y) / (2 * a_x * t + b_x);
+          float slope = atan( (x * m - y) / (log(2) * x * y) );
+          cgf.gc.gainCurveControlPointX.push_back(x);
+          cgf.gc.gainCurveControlPointY.push_back(log2(y / x));
+          cgf.gc.gainCurveControlPointTheta.push_back(slope / PI_CUSTOM * 180.0);
+        }
+        cvt.hatm.cgf.push_back(cgf);
+      }
+    } else {
+      cvt.hatm.numAlternateImages = elm.num_alternate_images;
+      if (elm.gain_application_space_chromaticities_mode == 0){
+        cvt.hatm.gainApplicationSpaceChromaticities[0] = 0.64;
+        cvt.hatm.gainApplicationSpaceChromaticities[1] = 0.33; 
+        cvt.hatm.gainApplicationSpaceChromaticities[2] = 0.3; 
+        cvt.hatm.gainApplicationSpaceChromaticities[3] = 0.6;
+        cvt.hatm.gainApplicationSpaceChromaticities[4] = 0.15; 
+        cvt.hatm.gainApplicationSpaceChromaticities[5] = 0.06;
+        cvt.hatm.gainApplicationSpaceChromaticities[6] = 0.3127;
+        cvt.hatm.gainApplicationSpaceChromaticities[7] = 0.329;
+      } else if (elm.gain_application_space_chromaticities_mode == 1){
+        cvt.hatm.gainApplicationSpaceChromaticities[0] = 0.68; 
+        cvt.hatm.gainApplicationSpaceChromaticities[1] = 0.32; 
+        cvt.hatm.gainApplicationSpaceChromaticities[2] = 0.265; 
+        cvt.hatm.gainApplicationSpaceChromaticities[3] = 0.69; 
+        cvt.hatm.gainApplicationSpaceChromaticities[4] = 0.15; 
+        cvt.hatm.gainApplicationSpaceChromaticities[5] = 0.06; 
+        cvt.hatm.gainApplicationSpaceChromaticities[6] = 0.3127; 
+        cvt.hatm.gainApplicationSpaceChromaticities[7] = 0.329; 
+      } else if (elm.gain_application_space_chromaticities_mode == 2){
         cvt.hatm.gainApplicationSpaceChromaticities[0] = 0.708;
         cvt.hatm.gainApplicationSpaceChromaticities[1] = 0.292;
-        cvt.hatm.gainApplicationSpaceChromaticities[2] = 0.17 ;
+        cvt.hatm.gainApplicationSpaceChromaticities[2] = 0.17;
         cvt.hatm.gainApplicationSpaceChromaticities[3] = 0.797;
         cvt.hatm.gainApplicationSpaceChromaticities[4] = 0.131;
         cvt.hatm.gainApplicationSpaceChromaticities[5] = 0.046;
         cvt.hatm.gainApplicationSpaceChromaticities[6] = 0.3127;
-        cvt.hatm.gainApplicationSpaceChromaticities[7] = 0.3290;
-        // Compute alternate headroom
-        cvt.hatm.alternateHdrHeadroom.push_back(0.0);
-        float headroom_to_anchor_ratio = std::min(cvt.hatm.baselineHdrHeadroom / log2(1000.0/203.0), 1.0);
-        float h_alt_1 = log2(8.0/3.0) * headroom_to_anchor_ratio;
-        cvt.hatm.alternateHdrHeadroom.push_back(h_alt_1);
-    
-        // Constant parameter across alternate images
-        float kappa  = 0.65;
-        float x_knee = 1;
-        float x_max  = pow(2.0, cvt.hatm.baselineHdrHeadroom);
-        for (uint16_t iAlt = 0;  iAlt  < cvt.hatm.numAlternateImages; iAlt++){
-          // Component mixing is maxRGB
-          ColorGainFunction cgf;
-          cgf.cm.componentMixRed = 0.0;
-          cgf.cm.componentMixGreen = 0.0;
-          cgf.cm.componentMixBlue = 0.0;
-          cgf.cm.componentMixMax = 1.0;
-          cgf.cm.componentMixMin = 0.0;
-          cgf.cm.componentMixComponent = 0.0; 
-          cgf.gc.gainCurveNumControlPoints = 8;
-    
-          // Inner vector for push_back
-          std::vector<float> inner_gainCurveControlPointX;
-          std::vector<float> inner_gainCurveControlPointY;
-          std::vector<float> inner_gainCurveControlPointTheta;
-    
-          // Compute the control points parameter depending on the alternate headroom
-          float  y_white = 1.0;
-          if (iAlt == 0) {
-            y_white = 1 - (0.5 * headroom_to_anchor_ratio );
+        cvt.hatm.gainApplicationSpaceChromaticities[7] = 0.329;
+      } else if (elm.gain_application_space_chromaticities_mode == 3){
+          for (uint16_t iCh = 0; iCh < 8; iCh++) {
+            cvt.hatm.gainApplicationSpaceChromaticities[iCh] = float(elm.gain_application_space_chromaticities[iCh]) / Q_GAIN_APPLICATION_SPACE_CHROMATICITY;
           }
-          float y_knee = y_white;
-          float y_max  = pow(2.0, cvt.hatm.alternateHdrHeadroom[iAlt]);
-          float x_mid = (1.0 - kappa) * x_knee + kappa * (x_knee * y_max / y_knee);
-          float y_mid = (1.0 - kappa) * y_knee + kappa * y_max;
-          // Compute Quadratic Beziers coefficients
-          float a_x = x_knee - 2 * x_mid + x_max;
-          float a_y = y_knee - 2 * y_mid + y_max;
-          float b_x = 2 * x_mid - 2 * x_knee;
-          float b_y = 2 * y_mid - 2 * y_knee;
-          float c_x = x_knee;
-          float c_y = y_knee;
-    
-          for (uint16_t iCps = 0; iCps < cgf.gc.gainCurveNumControlPoints; iCps++) {
-            // Compute the control points
-            float t = float(iCps) / (float(cgf.gc.gainCurveNumControlPoints) - 1.0);
-            float t_square = t * t;
-            float x = a_x * t_square + b_x * t + c_x;
-            float y = a_y * t_square + b_y * t + c_y;
-            float m = (2.0 * a_y * t + b_y) / (2 * a_x * t + b_x);
-            float slope = atan( (x * m - y) / (log(2) * x * y) );
-            cgf.gc.gainCurveControlPointX.push_back(x);
-            cgf.gc.gainCurveControlPointY.push_back(log2(y / x));
-            cgf.gc.gainCurveControlPointTheta.push_back(slope / PI_CUSTOM * 180.0);
-          }
-          cvt.hatm.cgf.push_back(cgf);
-        }
-    } else {
-        cvt.hatm.numAlternateImages = elm.num_alternate_images;
-        if (elm.gain_application_space_chromaticities_mode == 0){
-          cvt.hatm.gainApplicationSpaceChromaticities[0] = 0.64;
-          cvt.hatm.gainApplicationSpaceChromaticities[1] = 0.33; 
-          cvt.hatm.gainApplicationSpaceChromaticities[2] = 0.3; 
-          cvt.hatm.gainApplicationSpaceChromaticities[3] = 0.6;
-          cvt.hatm.gainApplicationSpaceChromaticities[4] = 0.15; 
-          cvt.hatm.gainApplicationSpaceChromaticities[5] = 0.06;
-          cvt.hatm.gainApplicationSpaceChromaticities[6] = 0.3127;
-          cvt.hatm.gainApplicationSpaceChromaticities[7] = 0.329;
-        } else if (elm.gain_application_space_chromaticities_mode == 1){
-          cvt.hatm.gainApplicationSpaceChromaticities[0] = 0.68; 
-          cvt.hatm.gainApplicationSpaceChromaticities[1] = 0.32; 
-          cvt.hatm.gainApplicationSpaceChromaticities[2] = 0.265; 
-          cvt.hatm.gainApplicationSpaceChromaticities[3] = 0.69; 
-          cvt.hatm.gainApplicationSpaceChromaticities[4] = 0.15; 
-          cvt.hatm.gainApplicationSpaceChromaticities[5] = 0.06; 
-          cvt.hatm.gainApplicationSpaceChromaticities[6] = 0.3127; 
-          cvt.hatm.gainApplicationSpaceChromaticities[7] = 0.329; 
-        } else if (elm.gain_application_space_chromaticities_mode == 2){
-          cvt.hatm.gainApplicationSpaceChromaticities[0] = 0.708;
-          cvt.hatm.gainApplicationSpaceChromaticities[1] = 0.292;
-          cvt.hatm.gainApplicationSpaceChromaticities[2] = 0.17;
-          cvt.hatm.gainApplicationSpaceChromaticities[3] = 0.797;
-          cvt.hatm.gainApplicationSpaceChromaticities[4] = 0.131;
-          cvt.hatm.gainApplicationSpaceChromaticities[5] = 0.046;
-          cvt.hatm.gainApplicationSpaceChromaticities[6] = 0.3127;
-          cvt.hatm.gainApplicationSpaceChromaticities[7] = 0.329;
-        } else if (elm.gain_application_space_chromaticities_mode == 3){
-            for (uint16_t iCh = 0; iCh < 8; iCh++) {
-              cvt.hatm.gainApplicationSpaceChromaticities[iCh] = float(elm.gain_application_space_chromaticities[iCh]) / Q_GAIN_APPLICATION_SPACE_CHROMATICITY;
-            }
+      } else {
+        std::cerr << "gain_application_space_primaries=" << elm.gain_application_space_chromaticities_mode << "  not defined.\n";
+      }
+      for (uint16_t iAlt = 0;  iAlt  < cvt.hatm.numAlternateImages; iAlt++){
+        isLinearInterpolation[iAlt] = false;
+        cvt.hatm.alternateHdrHeadroom.push_back(float(elm.alternate_hdr_headrooms[iAlt]) / Q_HDR_HEADROOM);
+        // init k_params to zero and replace the one that are not
+        ColorGainFunction cgf;
+        cgf.cm.componentMixRed = 0.0;
+        cgf.cm.componentMixGreen = 0.0;
+        cgf.cm.componentMixBlue = 0.0;
+        cgf.cm.componentMixMax= 0.0;
+        cgf.cm.componentMixMin = 0.0;
+        cgf.cm.componentMixComponent = 0.0;
+        if (elm.component_mixing_type[iAlt] == 0){
+          cgf.cm.componentMixMax   = 1.0;
+        } else if (elm.component_mixing_type[iAlt] == 1){
+          cgf.cm.componentMixComponent   = 1.0;
+        } else if (elm.component_mixing_type[iAlt] == 2){
+          cgf.cm.componentMixRed   = 1.0 / 6.0;
+          cgf.cm.componentMixGreen = 1.0 / 6.0;
+          cgf.cm.componentMixBlue  = 1.0 / 6.0;
+          cgf.cm.componentMixMax   = 1.0 / 2.0;
+        } else if (elm.component_mixing_type[iAlt] == 3){
+          cgf.cm.componentMixRed       = float(elm.component_mixing_coefficient[iAlt][0]) / Q_COMPONENT_MIXING_COEFFICIENT;
+          cgf.cm.componentMixGreen     = float(elm.component_mixing_coefficient[iAlt][0]) / Q_COMPONENT_MIXING_COEFFICIENT;
+          cgf.cm.componentMixBlue      = float(elm.component_mixing_coefficient[iAlt][0]) / Q_COMPONENT_MIXING_COEFFICIENT;
+          cgf.cm.componentMixMax       = float(elm.component_mixing_coefficient[iAlt][0]) / Q_COMPONENT_MIXING_COEFFICIENT;
+          cgf.cm.componentMixMin       = float(elm.component_mixing_coefficient[iAlt][0]) / Q_COMPONENT_MIXING_COEFFICIENT;
+          cgf.cm.componentMixComponent = float(elm.component_mixing_coefficient[iAlt][0]) / Q_COMPONENT_MIXING_COEFFICIENT;
         } else {
-          std::cerr << "gain_application_space_primaries=" << elm.gain_application_space_chromaticities_mode << "  not defined.\n";
-          error_raised = true;
+          std::cerr << "mix_encoding[" << iAlt << "]=" << elm.component_mixing_type[iAlt] << "  not defined.\n";
         }
-        for (uint16_t iAlt = 0;  iAlt  < cvt.hatm.numAlternateImages; iAlt++){
-        
-          cvt.hatm.alternateHdrHeadroom.push_back(float(elm.alternate_hdr_headrooms[iAlt]) / Q_HDR_HEADROOM);
-          // init k_params to zero and replace the one that are not
-          ColorGainFunction cgf;
-          cgf.cm.componentMixRed = 0.0;
-          cgf.cm.componentMixGreen = 0.0;
-          cgf.cm.componentMixBlue = 0.0;
-          cgf.cm.componentMixMax= 0.0;
-          cgf.cm.componentMixMin = 0.0;
-          cgf.cm.componentMixComponent = 0.0;
-          if (elm.component_mixing_type[iAlt] == 0){
-            cgf.cm.componentMixMax   = 1.0;
-          } else if (elm.component_mixing_type[iAlt] == 1){
-            cgf.cm.componentMixComponent   = 1.0;
-          } else if (elm.component_mixing_type[iAlt] == 2){
-            cgf.cm.componentMixRed   = 1.0 / 6.0;
-            cgf.cm.componentMixGreen = 1.0 / 6.0;
-            cgf.cm.componentMixBlue  = 1.0 / 6.0;
-            cgf.cm.componentMixMax   = 1.0 / 2.0;
-          } else if (elm.component_mixing_type[iAlt] == 3){
-            cgf.cm.componentMixRed       = float(elm.component_mixing_coefficient[iAlt][0]) / Q_COMPONENT_MIXING_COEFFICIENT;
-            cgf.cm.componentMixGreen     = float(elm.component_mixing_coefficient[iAlt][0]) / Q_COMPONENT_MIXING_COEFFICIENT;
-            cgf.cm.componentMixBlue      = float(elm.component_mixing_coefficient[iAlt][0]) / Q_COMPONENT_MIXING_COEFFICIENT;
-            cgf.cm.componentMixMax       = float(elm.component_mixing_coefficient[iAlt][0]) / Q_COMPONENT_MIXING_COEFFICIENT;
-            cgf.cm.componentMixMin       = float(elm.component_mixing_coefficient[iAlt][0]) / Q_COMPONENT_MIXING_COEFFICIENT;
-            cgf.cm.componentMixComponent = float(elm.component_mixing_coefficient[iAlt][0]) / Q_COMPONENT_MIXING_COEFFICIENT;
-          } else {
-            std::cerr << "mix_encoding[" << iAlt << "]=" << elm.component_mixing_type[iAlt] << "  not defined.\n";
-            error_raised = true;
+        cgf.gc.gainCurveNumControlPoints = elm.gain_curve_num_control_points_minus_1[iAlt] + 1;
+        for (uint16_t iCps = 0; iCps < cgf.gc.gainCurveNumControlPoints; iCps++) {
+          cgf.gc.gainCurveControlPointX.push_back(float(elm.gain_curve_control_points_x[iAlt][iCps]) / Q_GAIN_CURVE_CONTROL_POINT_X);
+          cgf.gc.gainCurveControlPointY.push_back(float(elm.gain_curve_control_points_y[iAlt][iCps]) / Q_GAIN_CURVE_CONTROL_POINT_Y - O_GAIN_CURVE_CONTROL_POINT_Y);
+          if (!elm.gain_curve_use_pchip_slope_flag[iAlt]) {
+            hasSlopeParameter[iAlt]     = true;
+            cgf.gc.gainCurveControlPointTheta.push_back(float(elm.gain_curve_control_points_theta[iAlt][iCps]) / Q_GAIN_CURVE_CONTROL_POINT_THETA - O_GAIN_CURVE_CONTROL_POINT_THETA);
           }
-          cgf.gc.gainCurveNumControlPoints = elm.gain_curve_num_control_points_minus_1[iAlt];
-          for (uint16_t iCps = 0; iCps < cgf.gc.gainCurveNumControlPoints; iCps++) {
-            cgf.gc.gainCurveControlPointX.push_back(float(elm.gain_curve_control_points_x[iAlt][iCps]) / Q_GAIN_CURVE_CONTROL_POINT_X);
-            cgf.gc.gainCurveControlPointY.push_back(float(elm.gain_curve_control_points_y[iAlt][iCps]) / Q_GAIN_CURVE_CONTROL_POINT_Y - O_GAIN_CURVE_CONTROL_POINT_Y);
-            if (!elm.gain_curve_use_pchip_slope_flag[iAlt]) {
-                cgf.gc.gainCurveControlPointTheta.push_back(float(elm.gain_curve_control_points_theta[iAlt][iCps]) / Q_GAIN_CURVE_CONTROL_POINT_THETA - O_GAIN_CURVE_CONTROL_POINT_THETA);
-            }
-          }
-          cvt.hatm.cgf.push_back(cgf);
+        }
+        cvt.hatm.cgf.push_back(cgf);
         }
     }
   }
 }
 
+nlohmann::json SMPTE_ST2094_50::encodeMetadataItemsToJson() {
+  nlohmann::json j;
+
+  j["frame_start"] = timeI.timeIntervalStart;
+  j["frame_duration"] = timeI.timeintervalDuration;
+
+  j["hdrReferenceWhite"] = cvt.hdrReferenceWhite;
+  if (isHeadroomAdaptiveToneMap) {
+    j["baselineHdrHeadroom"] = cvt.hatm.baselineHdrHeadroom;
+    if (!isReferenceWhiteToneMapping) {
+      j["numAlternateImages"] = cvt.hatm.numAlternateImages;
+      j["gainApplicationSpaceChromaticities"] = cvt.hatm.gainApplicationSpaceChromaticities;
+
+      if (cvt.hatm.numAlternateImages > 0) {
+        j["alternateHdrHeadroom"] = cvt.hatm.alternateHdrHeadroom;
+
+        std::vector<float> componentMixRed;
+        std::vector<float> componentMixGreen;
+        std::vector<float> componentMixBlue;
+        std::vector<float> componentMixMax;
+        std::vector<float> componentMixMin;
+        std::vector<float> componentMixComponent;
+
+        std::vector<uint32_t> gainCurveNumControlPoints;
+        std::vector<std::vector<float>> gainCurveControlPointX_ptr;
+        std::vector<std::vector<float>> gainCurveControlPointY_ptr;
+        std::vector<std::vector<float>> gainCurveControlPointT_ptr;
+        // "Unnesting" the variables: Accessing individual members of each struct
+        for (size_t i = 0; i < cvt.hatm.cgf.size(); i++) { // Range-based for loop for convenience
+          componentMixRed.push_back(cvt.hatm.cgf[i].cm.componentMixRed);
+          componentMixGreen.push_back(cvt.hatm.cgf[i].cm.componentMixGreen);
+          componentMixBlue.push_back(cvt.hatm.cgf[i].cm.componentMixBlue);
+          componentMixMax.push_back(cvt.hatm.cgf[i].cm.componentMixMax);
+          componentMixMin.push_back(cvt.hatm.cgf[i].cm.componentMixMin);
+          componentMixComponent.push_back(cvt.hatm.cgf[i].cm.componentMixComponent);
+
+          gainCurveNumControlPoints.push_back(cvt.hatm.cgf[i].gc.gainCurveNumControlPoints);
+          std::vector<float> gainCurveControlPointX;
+          std::vector<float> gainCurveControlPointY;
+          std::vector<float> gainCurveControlPointT;
+          for (uint32_t p = 0; p < cvt.hatm.cgf[i].gc.gainCurveNumControlPoints; p++){
+            gainCurveControlPointX.push_back(cvt.hatm.cgf[i].gc.gainCurveControlPointX[p]);
+            gainCurveControlPointY.push_back(cvt.hatm.cgf[i].gc.gainCurveControlPointY[p]);
+          }
+          for (size_t p = 0; p < cvt.hatm.cgf[i].gc.gainCurveControlPointTheta.size(); p++){
+            gainCurveControlPointT.push_back(cvt.hatm.cgf[i].gc.gainCurveControlPointTheta[p]);
+          }
+          gainCurveControlPointX_ptr.push_back(gainCurveControlPointX);
+          gainCurveControlPointY_ptr.push_back(gainCurveControlPointY);
+          gainCurveControlPointT_ptr.push_back(gainCurveControlPointT);
+
+        }
+
+        j["componentMixRed"]        = componentMixRed;
+        j["componentMixGreen"]      = componentMixGreen;
+        j["componentMixBlue"]       = componentMixBlue;
+        j["componentMixMax"]        = componentMixMax;
+        j["componentMixMin"]        = componentMixMin;
+        j["componentMixComponent"]  = componentMixComponent;
+
+        j["gainCurveNumControlPoints"] = gainCurveNumControlPoints;
+        j["gainCurveControlPointX"]    = gainCurveControlPointX_ptr;
+        j["gainCurveControlPointY"]    = gainCurveControlPointY_ptr;
+        j["gainCurveControlPointX"]    = gainCurveControlPointT_ptr;
+      }
+    }
+  }
+return j;
+}
 
 /* *********************************** DEBUGGING SECTION *******************************************************************************************/
 // Print the metadata item 

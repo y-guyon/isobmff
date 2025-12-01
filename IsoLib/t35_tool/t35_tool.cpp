@@ -99,7 +99,7 @@ MetadataMap parseMetadataFolder(const std::string& metadataFolder) {
       // Decode SMPTE ST 2094-50 Metadata Items from json
       bool error_raised = false;
       SMPTE_ST2094_50 st2094_50; // Create an object of MyClass
-      error_raised = st2094_50.decodeJsonToMetadataItems(j, path); // decode the json to metadata items
+      error_raised = st2094_50.decodeJsonToMetadataItems(j); // decode the json to metadata items
       st2094_50.dbgPrintMetadataItems(false);  // print up to what was decoded from the json
       if (error_raised) {
         std::cerr << "Skipping " << path << " error decoding json file\n";
@@ -110,6 +110,17 @@ MetadataMap parseMetadataFolder(const std::string& metadataFolder) {
       payloadBinaryData = st2094_50.getPayloadData();
       frame_start       = st2094_50.getTimeIntervalStart();
       frame_duration    = st2094_50.getTimeintervalDuration();
+
+      // Write metadata items to a json file for easy comparison with decoded ones
+      nlohmann::json j_dbg = st2094_50.encodeMetadataItemsToJson();
+      std::ofstream outputFile("encoderSideMetadataItems.json");
+      if (outputFile.is_open()) {
+        outputFile << j_dbg.dump(4); // .dump(4) for pretty-printing with 4-space indentation
+        outputFile.close();
+      } else {
+        // Handle error: file could not be opened
+        std::cerr << "Error opening file for writing!" << std::endl;
+      }
 
       // write the payload data to a binary file
       auto baseName = path.stem().string();  // e.g. ST2094-50_IMG_0564_metadataItems
@@ -165,7 +176,20 @@ void decodeBinaryData(const std::string& inputFile) {
   SMPTE_ST2094_50 st2094_50; // Create an object of MyClass
   st2094_50.decodeBinaryToSyntaxElements(binary_data);
   st2094_50.convertSyntaxElementsToMetadataItems();
-  st2094_50.dbgPrintMetadataItems(true);  // print decoded metadata from bitstream
+  // [Todo: set timing metadata]
+  st2094_50.dbgPrintMetadataItems(true);  // Print decoded metadata from bitstream
+
+
+  // Write decoded metadata items to a json file
+  nlohmann::json j = st2094_50.encodeMetadataItemsToJson();
+  std::ofstream outputFile("decoderSideMetadataItems.json");
+  if (outputFile.is_open()) {
+    outputFile << j.dump(4); // .dump(4) for pretty-printing with 4-space indentation
+    outputFile.close();
+  } else {
+    // Handle error: file could not be opened
+    std::cerr << "Error opening file for writing!" << std::endl;
+  }
   return;
 
 }
