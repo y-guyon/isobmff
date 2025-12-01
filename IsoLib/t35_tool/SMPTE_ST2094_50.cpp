@@ -41,6 +41,7 @@ void printDebug(const std::string& varName, uint16_t varValue, uint8_t nbBits) {
       break;
     case 8:
       std::cout.width(16); std::cout <<  std::bitset<8>(varValue).to_string() << "\n";
+      break;
     case 16:
       std::cout.width(16); std::cout <<  std::bitset<16>(varValue).to_string() << "\n";
       break;
@@ -49,6 +50,121 @@ void printDebug(const std::string& varName, uint16_t varValue, uint8_t nbBits) {
   }
 }
 
+
+void push_boolean(struct BinaryData *payloadBinaryData, bool boolValue, const std::string& varName){
+    uint8_t decValue = static_cast<uint8_t>(boolValue) ;
+    payloadBinaryData->payload[payloadBinaryData->byteIdx] = payloadBinaryData->payload[payloadBinaryData->byteIdx] + (decValue << (7 - payloadBinaryData->bitIdx));
+    printDebug(varName, decValue,  1);
+    //printDebug("Bool--" + varName, (decValue << (7 - payloadBinaryData->bitIdx)),  8);
+
+    payloadBinaryData->bitIdx++;
+    if (payloadBinaryData->bitIdx == uint8_t(8)){
+        payloadBinaryData->bitIdx = 0;
+        payloadBinaryData->payload.push_back(0); payloadBinaryData->byteIdx++;
+    } else if (payloadBinaryData->bitIdx > 8) {
+        // Error to handle
+        dbgPrintMilestones(1, "************************************ Error To Check *************************************************************************************", decValue);
+    }
+}
+
+void push_bits(struct BinaryData *payloadBinaryData, uint8_t value, uint8_t nbBits, const std::string& varName){
+    payloadBinaryData->payload[payloadBinaryData->byteIdx] = payloadBinaryData->payload[payloadBinaryData->byteIdx] + (value << ( 8 - nbBits - payloadBinaryData->bitIdx));
+    printDebug(varName, value,  nbBits);
+    //printDebug("Bits--" + varName, (value << ( 8 - nbBits - payloadBinaryData->bitIdx)),  8);
+    payloadBinaryData->bitIdx += nbBits;
+    if ( payloadBinaryData->bitIdx == 8){
+        payloadBinaryData->byteIdx++;
+        payloadBinaryData->bitIdx = 0;
+        payloadBinaryData->payload.push_back(0);
+    } else if ( payloadBinaryData->bitIdx == 8) {
+        // Error to handle
+        dbgPrintMilestones(1, "************************************ Error To Check *************************************************************************************", value);
+        dbgPrintMilestones(nbBits, varName, value);
+    }
+}
+
+void push_8bits(struct BinaryData *payloadBinaryData, uint16_t value, const std::string& varName){
+    // Verify that we are at the start of a byte
+    if (payloadBinaryData->bitIdx != 0){
+        dbgPrintMilestones(89, "************************************ Error To Check *************************************************************************************", value);
+    } else {
+        payloadBinaryData->payload[payloadBinaryData->byteIdx] = uint8_t(value & 0x00FF);
+        payloadBinaryData->payload.push_back(0); payloadBinaryData->byteIdx++; 
+        printDebug(varName, value,  8);
+    }
+}
+
+void push_16bits(struct BinaryData *payloadBinaryData, uint16_t value, const std::string& varName){
+    // Verify that we are at the start of a byte
+    if (payloadBinaryData->bitIdx != 0){
+        dbgPrintMilestones(89, "************************************ Error To Check *************************************************************************************", value);
+    } else {
+        payloadBinaryData->payload[payloadBinaryData->byteIdx] = uint8_t((value >> 8) & 0x00FF);
+        payloadBinaryData->payload.push_back(0); payloadBinaryData->byteIdx++; 
+        payloadBinaryData->payload[payloadBinaryData->byteIdx] = uint8_t((value     ) & 0x00FF);
+        payloadBinaryData->payload.push_back(0); payloadBinaryData->byteIdx++; 
+        printDebug(varName, value,  16);
+    }
+}
+
+bool pull_boolean(struct BinaryData *payloadBinaryData, const std::string& varName){
+    uint8_t decValue = (payloadBinaryData->payload[payloadBinaryData->byteIdx] >> (7 - payloadBinaryData->bitIdx)) & 0x01 ;
+    bool result = static_cast<bool>(decValue) ;
+    payloadBinaryData->bitIdx++;
+    if (payloadBinaryData->bitIdx == uint8_t(8)){        
+        payloadBinaryData->byteIdx++;
+        payloadBinaryData->bitIdx = 0;
+    } else if (payloadBinaryData->bitIdx > 8) {
+        // Error to handle
+        dbgPrintMilestones(1, "************************************ Error To Check *************************************************************************************", decValue);
+    }
+    printDebug(varName, decValue,  1);
+    return result;
+}
+
+uint16_t pull_bits(struct BinaryData *payloadBinaryData, uint8_t nbBits, const std::string& varName){
+    uint8_t decValue = uint8_t(payloadBinaryData->payload[payloadBinaryData->byteIdx] << payloadBinaryData->bitIdx) >> ((8 - nbBits)); 
+    payloadBinaryData->bitIdx += nbBits;
+    if ( payloadBinaryData->bitIdx == 8){
+        payloadBinaryData->byteIdx++;
+        payloadBinaryData->bitIdx = 0;
+    } else if ( payloadBinaryData->bitIdx == 8) {
+        // Error to handle
+        dbgPrintMilestones(1, "************************************ Error To Check *************************************************************************************", decValue);
+        dbgPrintMilestones(nbBits, varName, decValue);
+    }
+    printDebug(varName, decValue,  nbBits);
+    return uint16_t(decValue);
+}
+
+uint16_t pull_8bits(struct BinaryData *payloadBinaryData, const std::string& varName){
+    // Verify that we are at the start of a byte
+    uint16_t decValue = 404;
+    if (payloadBinaryData->bitIdx != 0){
+        dbgPrintMilestones(89, "************************************ Error To Check *************************************************************************************", 0);
+    } else {
+        decValue = uint16_t(payloadBinaryData->payload[payloadBinaryData->byteIdx]);
+    }
+    printDebug(varName, decValue,  8);
+    payloadBinaryData->byteIdx++;
+    return decValue;
+}
+
+uint16_t pull_16bits(struct BinaryData *payloadBinaryData, const std::string& varName){
+    // Verify that we are at the start of a byte
+    uint16_t decValue = 404;
+    if (payloadBinaryData->bitIdx != 0){
+        dbgPrintMilestones(89, "************************************ Error To Check *************************************************************************************", 0);
+    } else {
+        decValue = uint16_t(payloadBinaryData->payload[payloadBinaryData->byteIdx]) << 8; payloadBinaryData->byteIdx++;
+        decValue = decValue + uint16_t(payloadBinaryData->payload[payloadBinaryData->byteIdx]); payloadBinaryData->byteIdx++;
+        printDebug(varName, decValue,  16);
+    }
+    return decValue;
+}
+
+
+/* *********************************** SMPTE ST 2094-50 FUNCTIONS *******************************************************************************************/
 // Constructors
 SMPTE_ST2094_50::SMPTE_ST2094_50(){
     keyValue = "B500900001:SMPTE-ST2094-50";
@@ -65,7 +181,7 @@ SMPTE_ST2094_50::SMPTE_ST2094_50(){
 }
 
 // Getters
-std::vector<uint8_t>    SMPTE_ST2094_50::getPayloadData(){return payloadBinaryData;}
+std::vector<uint8_t>    SMPTE_ST2094_50::getPayloadData(){return payloadBinaryData.payload;}
 uint32_t                SMPTE_ST2094_50::getTimeIntervalStart(){return timeI.timeIntervalStart;}
 uint32_t                SMPTE_ST2094_50::getTimeintervalDuration(){return timeI.timeintervalDuration;}
 
@@ -368,106 +484,83 @@ void SMPTE_ST2094_50::convertMetadataItemsToSyntaxElements(){
 void SMPTE_ST2094_50::writeSyntaxElementsToBinaryData(){
 // ================================================= Convert binary data from Syntax Elements ===================================
 uint8_t value_8; 
-std::cout << "++++++++++++++++++++++ start SMPTE_ST2094_50:: writeSyntaxElementsToBinaryData ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\n";  
-printDebug("application_version", elm.application_version, 8);
-value_8 = elm.application_version; 
-payloadBinaryData.push_back(value_8);
+// Initialize the binary payload structure
+payloadBinaryData.byteIdx = 0;
+payloadBinaryData.bitIdx  = 0;
+payloadBinaryData.payload.push_back(0);
 
-printDebug("has_custom_hdr_reference_white_flag",elm.has_custom_hdr_reference_white_flag, 1);
-printDebug("has_adaptive_tone_map_flag",elm.has_adaptive_tone_map_flag, 1);
-value_8 = (elm.has_custom_hdr_reference_white_flag << 7) + (elm.has_adaptive_tone_map_flag << 6);
-payloadBinaryData.push_back(value_8);
+std::cout << "++++++++++++++++++++++ start SMPTE_ST2094_50:: writeSyntaxElementsToBinaryData ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\n";  
+push_8bits(&payloadBinaryData, elm.application_version, "application_version");
+
+push_boolean(&payloadBinaryData, elm.has_custom_hdr_reference_white_flag, "has_custom_hdr_reference_white_flag");
+push_boolean(&payloadBinaryData, elm.has_adaptive_tone_map_flag, "has_adaptive_tone_map_flag");
+push_bits(&payloadBinaryData, 0, 6, "zero_6");
 
 if (elm.has_custom_hdr_reference_white_flag){
-printDebug("hdr_reference_white", elm.hdr_reference_white, 16);
-value_8 = uint8_t((elm.hdr_reference_white >> 8) & 0x00FF); payloadBinaryData.push_back(value_8);
-value_8 = uint8_t((elm.hdr_reference_white     ) & 0x00FF); payloadBinaryData.push_back(value_8);
+    push_16bits(&payloadBinaryData, elm.hdr_reference_white, "hdr_reference_white");
 }
 
 if (elm.has_adaptive_tone_map_flag) {
-printDebug("baseline_hdr_headroom", elm.baseline_hdr_headroom, 16);
-value_8 = uint8_t((elm.baseline_hdr_headroom >> 8) & 0x00FF); payloadBinaryData.push_back(value_8);
-value_8 = uint8_t((elm.baseline_hdr_headroom     ) & 0x00FF); payloadBinaryData.push_back(value_8);
-
-printDebug("use_reference_white_tone_mapping_flag",elm.use_reference_white_tone_mapping_flag, 1);
-if (!elm.use_reference_white_tone_mapping_flag) {
-    printDebug("num_alternate_images",elm.num_alternate_images, 3);
-    printDebug("gain_application_space_chromaticities_mode",elm.gain_application_space_chromaticities_mode, 2);
-    printDebug("has_common_mixing_coefficient_flag",elm.has_common_mixing_coefficient_flag, 1);
-    printDebug("has_common_curve_params_flag",elm.has_common_curve_params_flag, 1);
-    value_8 = (elm.use_reference_white_tone_mapping_flag << 7) + (elm.num_alternate_images << 4) + (elm.gain_application_space_chromaticities_mode << 2) + 
-    (elm.has_common_mixing_coefficient_flag << 1) + (elm.has_common_curve_params_flag );
-    payloadBinaryData.push_back(value_8);
-
-    if (elm.gain_application_space_chromaticities_mode == 3) {
-    for (uint16_t iCh = 0; iCh < 8; iCh++) {
-        printDebug("gain_application_space_chromaticities", elm.gain_application_space_chromaticities[iCh], 16);
-        value_8 = uint8_t((elm.gain_application_space_chromaticities[iCh] >> 8) & 0x00FF); payloadBinaryData.push_back(value_8);
-        value_8 = uint8_t((elm.gain_application_space_chromaticities[iCh]     ) & 0x00FF); payloadBinaryData.push_back(value_8);
-    }
-    }
-
-    for (uint16_t iAlt = 0; iAlt < elm.num_alternate_images; iAlt++) {
-    printDebug("alternate_hdr_headrooms[iAlt]", elm.alternate_hdr_headrooms[iAlt], 16);
-    value_8 = uint8_t((elm.alternate_hdr_headrooms[iAlt] >> 8) & 0x00FF); payloadBinaryData.push_back(value_8);
-    value_8 = uint8_t((elm.alternate_hdr_headrooms[iAlt]     ) & 0x00FF); payloadBinaryData.push_back(value_8);
-
-    // Write component mixing function parameters
-    if ( iAlt == 0 || !elm.has_common_mixing_coefficient_flag){
-        printDebug("component_mixing_type[iAlt]", elm.component_mixing_type[iAlt], 2);
-        value_8 = (elm.component_mixing_type[iAlt] << 6);
-        if (elm.component_mixing_type[iAlt] == 3) {
-        // Write the flag to indicate which coefficients are signaled 
-        for (uint8_t iCm = 0; iCm < MAX_NB_component_mixing_coefficient; iCm++) {
-            uint8_t flagValue = static_cast<uint8_t>(elm.has_component_mixing_coefficient_flag[iAlt][iCm]);
-            value_8 = value_8 + (flagValue << (5 - iCm) );
-        }   
-        payloadBinaryData.push_back(value_8); 
-        // Write the coefficients 
-        for (uint8_t iCm = 0; iCm < MAX_NB_component_mixing_coefficient; iCm++) {
-            if (elm.has_component_mixing_coefficient_flag[iAlt][iCm]) {
-            printDebug("component_mixing_coefficient", elm.component_mixing_coefficient[iAlt][iCm], 16);
-            value_8 = uint8_t((elm.component_mixing_coefficient[iAlt][iCm] >> 8) & 0x00FF); payloadBinaryData.push_back(value_8);
-            value_8 = uint8_t((elm.component_mixing_coefficient[iAlt][iCm]     ) & 0x00FF); payloadBinaryData.push_back(value_8);
+    push_16bits(&payloadBinaryData, elm.baseline_hdr_headroom, "baseline_hdr_headroom");
+    push_boolean(&payloadBinaryData, elm.use_reference_white_tone_mapping_flag, "use_reference_white_tone_mapping_flag");
+    if (!elm.use_reference_white_tone_mapping_flag) {
+        push_bits(&payloadBinaryData, uint8_t(elm.num_alternate_images)                      , 3, "num_alternate_images");
+        push_bits(&payloadBinaryData, uint8_t(elm.gain_application_space_chromaticities_mode), 2, "gain_application_space_chromaticities_mode");
+        push_boolean(&payloadBinaryData, elm.has_common_mixing_coefficient_flag                 , "has_common_mixing_coefficient_flag");
+        push_boolean(&payloadBinaryData, elm.has_common_curve_params_flag                       , "has_common_curve_params_flag");
+        if (elm.gain_application_space_chromaticities_mode == 3) {
+            for (uint16_t iCh = 0; iCh < 8; iCh++) {
+                push_16bits(&payloadBinaryData, elm.gain_application_space_chromaticities[iCh], "gain_application_space_chromaticities[iCh]");
             }
-        }                
-        } else {
-        payloadBinaryData.push_back(value_8); 
         }
-    }
 
-    /// Write gain curve function parameters
-    if ( iAlt == 0 || elm.has_common_curve_params_flag){
-        //printDebug("gain_curve_interpolation[iAlt]",elm.gain_curve_interpolation[iAlt], 2);
-        printDebug("gain_curve_num_control_points_minus_1[iAlt]",elm.gain_curve_num_control_points_minus_1[iAlt], 5);
-        printDebug("gain_curve_use_pchip_slope_flag",elm.gain_curve_use_pchip_slope_flag[iAlt], 1);
-        value_8 = (elm.gain_curve_num_control_points_minus_1[iAlt] << 3) + (elm.gain_curve_use_pchip_slope_flag[iAlt] << 2) ;
-        payloadBinaryData.push_back(value_8);
-        
-        for (uint16_t iCps = 0; iCps < elm.gain_curve_num_control_points_minus_1[iAlt] + 1; iCps++){
-        printDebug("gain_curve_control_points_x[iAlt][iCps]",elm.gain_curve_control_points_x[iAlt][iCps], 16);
-        value_8 = uint8_t((elm.gain_curve_control_points_x[iAlt][iCps] >> 8) & 0x00FF); payloadBinaryData.push_back(value_8);
-        value_8 = uint8_t((elm.gain_curve_control_points_x[iAlt][iCps]     ) & 0x00FF); payloadBinaryData.push_back(value_8);
+        for (uint16_t iAlt = 0; iAlt < elm.num_alternate_images; iAlt++) {
+            push_16bits(&payloadBinaryData, elm.alternate_hdr_headrooms[iAlt], "alternate_hdr_headrooms[iAlt]");
+            // Write component mixing function parameters
+            if ( iAlt == 0 || !elm.has_common_mixing_coefficient_flag){
+                push_bits(&payloadBinaryData, uint8_t(elm.component_mixing_type[iAlt]>> 8), 2, "component_mixing_type[iAlt]");
+                if (elm.component_mixing_type[iAlt] == 3) {
+                    // Write the flag to indicate which coefficients are signaled 
+                    uint8_t value_8 = 0;
+                    for (uint8_t iCm = 0; iCm < MAX_NB_component_mixing_coefficient; iCm++) {
+                        uint8_t flagValue = static_cast<uint8_t>(elm.has_component_mixing_coefficient_flag[iAlt][iCm]);
+                        value_8 = value_8 + (flagValue << (5 - iCm) );
+                    }   
+                    push_bits(&payloadBinaryData, value_8, 6, "has_component_mixing_coefficient_flag[iAlt]");
+                    // Write the coefficients 
+                    for (uint8_t iCm = 0; iCm < MAX_NB_component_mixing_coefficient; iCm++) {
+                        if (elm.has_component_mixing_coefficient_flag[iAlt][iCm]) {
+                            push_16bits(&payloadBinaryData, elm.component_mixing_coefficient[iAlt][iCm], "component_mixing_coefficient[iAlt][iCm]");
+                        }
+                    }                
+                } else {
+                    push_bits(&payloadBinaryData, 0, 6, "zero_6bits[iAlt][iCm]");
+                }
+            }
+            /// Write gain curve function parameters
+            if ( iAlt == 0 || elm.has_common_curve_params_flag){
+                push_bits(&payloadBinaryData,    elm.gain_curve_num_control_points_minus_1[iAlt], 5, "gain_curve_num_control_points_minus_1[iAlt]");
+                push_boolean(&payloadBinaryData, elm.gain_curve_use_pchip_slope_flag[iAlt]      ,    "gain_curve_use_pchip_slope_flag[iAlt]"); 
+                push_bits(&payloadBinaryData,     0                                             , 2, "zero_2bits[iAlt]");                
+                for (uint16_t iCps = 0; iCps < elm.gain_curve_num_control_points_minus_1[iAlt] + 1; iCps++){
+                    push_16bits(&payloadBinaryData, elm.gain_curve_control_points_x[iAlt][iCps], "gain_curve_control_points_x[iAlt][iCps]");
+                }
+            }
+            for (uint16_t iCps = 0; iCps < elm.gain_curve_num_control_points_minus_1[iAlt] + 1; iCps++) {
+                push_16bits(&payloadBinaryData, elm.gain_curve_control_points_y[iAlt][iCps], "gain_curve_control_points_y[iAlt][iCps]");
+            }
+            if (!elm.gain_curve_use_pchip_slope_flag[iAlt]) {
+                for (uint16_t iCps = 0; iCps < elm.gain_curve_num_control_points_minus_1[iAlt] + 1; iCps++) {
+                    push_16bits(&payloadBinaryData, elm.gain_curve_control_points_theta[iAlt][iCps], "gain_curve_control_points_theta[iAlt][iCps]");
+                }
+            }
         }
     }
-    for (uint16_t iCps = 0; iCps < elm.gain_curve_num_control_points_minus_1[iAlt] + 1; iCps++) {
-        printDebug("gain_curve_control_points_y[iAlt][iCps]",elm.gain_curve_control_points_y[iAlt][iCps], 16);
-        value_8 = uint8_t((elm.gain_curve_control_points_y[iAlt][iCps] >> 8) & 0x00FF); payloadBinaryData.push_back(value_8);
-        value_8 = uint8_t((elm.gain_curve_control_points_y[iAlt][iCps]     ) & 0x00FF); payloadBinaryData.push_back(value_8);
+    else{ // No more information need to be signaled when using Reference White Tone Mapping Operator
+        push_bits(&payloadBinaryData, 0, 7, "zero_7bits");
     }
-    if (!elm.gain_curve_use_pchip_slope_flag[iAlt]) {
-        for (uint16_t iCps = 0; iCps < elm.gain_curve_num_control_points_minus_1[iAlt] + 1; iCps++) {
-        printDebug("gain_curve_control_points_theta[iAlt][iCps]",elm.gain_curve_control_points_theta[iAlt][iCps], 16);
-        value_8 = uint8_t((elm.gain_curve_control_points_theta[iAlt][iCps] >> 8) & 0x00FF); payloadBinaryData.push_back(value_8);
-        value_8 = uint8_t((elm.gain_curve_control_points_theta[iAlt][iCps]     ) & 0x00FF); payloadBinaryData.push_back(value_8);
-        }
-    }
-    }
-}
-}
-else{ // No more information need to be signaled when using Reference White Tone Mapping Operator
-value_8 = (elm.use_reference_white_tone_mapping_flag << 7);
-payloadBinaryData.push_back(value_8);
+    // reomve the latest elements created but not used
+    payloadBinaryData.payload.pop_back();
 }
 
 // outFile.close(); // Close the file
@@ -476,67 +569,66 @@ std::cout << "+++++++++++++++++++++++++++++++ End SMPTE_ST2094_50:: writeSyntaxE
 
 /* *********************************** DECODING SECTION ********************************************************************************************/
 
-
 // Decode binary data into syntax elements
 void SMPTE_ST2094_50::decodeBinaryToSyntaxElements(std::vector<uint8_t> binary_data) {
 
-  uint16_t decoded_sample = 0;
+  // Adapt binary data
+  // Initialize the binary payload structure
+  payloadBinaryData.byteIdx = 0;
+  payloadBinaryData.bitIdx  = 0;
+  for (int i = 0; i < binary_data.size(); i++) {
+      payloadBinaryData.payload.push_back(binary_data[i]);
+      std::string result = "Byte[" + std::to_string(i) + "]= ";
+      printDebug(result, uint16_t(binary_data[i]), 8);
+      //std::cout << "Byte[" << i << "] = " << uint16_t(binary_data[i]) << std::endl;
+      //std::cout << std::hex << std::uppercase <<  binary_data[i] << std::endl;
+  }
+
   std::cout << "++++++++++++++++++++++Syntax Elements Decoding ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\n"; 
-  elm.application_version = (binary_data[decoded_sample] & 0xFF); printDebug("application_version", elm.application_version, 8);
-  decoded_sample++;
+  elm.application_version = pull_8bits(&payloadBinaryData, "application_version");
 
-  elm.has_custom_hdr_reference_white_flag = (binary_data[decoded_sample] & 0x80) >> 7; printDebug("has_custom_hdr_reference_white_flag",elm.has_custom_hdr_reference_white_flag, 1);
-  elm.has_adaptive_tone_map_flag          = (binary_data[decoded_sample] & 0x80) >> 6; printDebug("has_adaptive_tone_map_flag",elm.has_adaptive_tone_map_flag, 1);
-  decoded_sample++;
+  elm.has_custom_hdr_reference_white_flag = pull_boolean(&payloadBinaryData, "has_custom_hdr_reference_white_flag");
+  elm.has_adaptive_tone_map_flag = pull_boolean(&payloadBinaryData, "has_adaptive_tone_map_flag");
+  pull_bits(&payloadBinaryData, 6, "zero_6bits");
 
-  
   if (elm.has_custom_hdr_reference_white_flag){
-    elm.hdr_reference_white = (uint16_t(binary_data[decoded_sample]) << 8) + (uint16_t(binary_data[decoded_sample+1]) ); printDebug("hdr_reference_white", elm.hdr_reference_white, 16);
-    decoded_sample++;
-    decoded_sample++;
+    elm.hdr_reference_white = pull_16bits(&payloadBinaryData, "hdr_reference_white");
   }
 
   if (elm.has_adaptive_tone_map_flag) {
-    elm.baseline_hdr_headroom = (uint16_t(binary_data[decoded_sample]) << 8) + (uint16_t(binary_data[decoded_sample+1]) ); printDebug("baseline_hdr_headroom", elm.baseline_hdr_headroom, 16);
-    decoded_sample++;
-    decoded_sample++;
-
-    elm.use_reference_white_tone_mapping_flag          = (binary_data[decoded_sample] & 0x80) >> 7; printDebug("use_reference_white_tone_mapping_flag",elm.use_reference_white_tone_mapping_flag, 1);
-    if (elm.use_reference_white_tone_mapping_flag){}
-        elm.num_alternate_images                       = (binary_data[decoded_sample] & 0x70) >> 4; printDebug("num_alternate_images",elm.num_alternate_images, 3);
-        elm.gain_application_space_chromaticities_mode = (binary_data[decoded_sample] & 0x0C) >> 2; printDebug("gain_application_space_chromaticities_mode",elm.gain_application_space_chromaticities_mode, 2);
-        elm.has_common_mixing_coefficient_flag         = (binary_data[decoded_sample] & 0x02) >> 1; printDebug("has_common_mixing_coefficient_flag",elm.has_common_mixing_coefficient_flag, 1);
-        elm.has_common_curve_params_flag               = (binary_data[decoded_sample] & 0x01)     ; printDebug("has_common_curve_params_flag",elm.has_common_curve_params_flag , 1);
-        decoded_sample++;
+    elm.baseline_hdr_headroom = pull_16bits(&payloadBinaryData, "baseline_hdr_headroom");  
+    
+    elm.use_reference_white_tone_mapping_flag = pull_boolean(&payloadBinaryData, "use_reference_white_tone_mapping_flag");
+    if (!elm.use_reference_white_tone_mapping_flag){
+        elm.num_alternate_images = pull_bits(&payloadBinaryData, 3, "num_alternate_images");
+        elm.gain_application_space_chromaticities_mode = pull_bits(&payloadBinaryData, 2, "gain_application_space_chromaticities_mode");
+        elm.has_common_mixing_coefficient_flag = pull_boolean(&payloadBinaryData, "has_common_mixing_coefficient_flag");
+        elm.has_common_curve_params_flag = pull_boolean(&payloadBinaryData, "has_common_curve_params_flag");  
 
         if (elm.gain_application_space_chromaticities_mode == 3) {
             for (uint16_t iCh = 0; iCh < 8; iCh++) {
-                elm.gain_application_space_chromaticities[iCh] = (uint16_t(binary_data[decoded_sample]) << 8) + (uint16_t(binary_data[decoded_sample+1]) );
-                printDebug("gain_application_space_chromaticities[iCh]",elm.gain_application_space_chromaticities[iCh], 16);
-                decoded_sample++;
-                decoded_sample++;
+                elm.gain_application_space_chromaticities[iCh] = pull_16bits(&payloadBinaryData, "gain_application_space_chromaticities[iCh]");                
               }
         }
 
         for (uint16_t iAlt = 0; iAlt < elm.num_alternate_images; iAlt++) {
-            elm.alternate_hdr_headrooms[iAlt] = (uint16_t(binary_data[decoded_sample]) << 8) + (uint16_t(binary_data[decoded_sample+1]) ); printDebug("alternate_hdr_headrooms[iAlt]",elm.alternate_hdr_headrooms[iAlt], 16);
-            decoded_sample++;
-            decoded_sample++;
+            elm.alternate_hdr_headrooms[iAlt] = pull_16bits(&payloadBinaryData, "elm.alternate_hdr_headrooms[iAlt]"); 
+
             // Read component mixing function parameters - Table C.4
             if ( iAlt == 0 || !elm.has_common_mixing_coefficient_flag){
-              elm.component_mixing_type[iAlt] = uint16_t(binary_data[decoded_sample] & 0xC0) >> 6; printDebug("component_mixing_type[iAlt]", elm.component_mixing_type[iAlt], 2);
+                elm.component_mixing_type[iAlt] = pull_bits(&payloadBinaryData, 2, "elm.component_mixing_type[iAlt]");
               if (elm.component_mixing_type[iAlt] == 3) {
-                uint8_t has_component_mixing_coefficient_flag = binary_data[decoded_sample] & 0x3F; decoded_sample++;
+                uint8_t has_component_mixing_coefficient_flag = pull_bits(&payloadBinaryData, 6, "elm.component_mixing_type[iAlt]"); 
                 // Decode the flags and the associated values
                 for (uint8_t iCm = 0; iCm < MAX_NB_component_mixing_coefficient; iCm++) {
-                    elm.has_component_mixing_coefficient_flag[iAlt][iCm] = bool( has_component_mixing_coefficient_flag & (0x01 << (5 - iCm) ) ); printDebug("elm.has_component_mixing_coefficient_flag[iAlt][iCm]", elm.has_component_mixing_coefficient_flag[iAlt][iCm], 1);
+                    elm.has_component_mixing_coefficient_flag[iAlt][iCm] = bool( has_component_mixing_coefficient_flag & (0x01 << (5 - iCm) ) );
                     if (elm.has_component_mixing_coefficient_flag[iAlt][iCm]) {
-                        elm.component_mixing_coefficient[iAlt][iCm] = (uint16_t(binary_data[decoded_sample]) << 8) + (uint16_t(binary_data[decoded_sample+1]) ); printDebug("component_mixing_coefficient[iAlt][iCm]", elm.component_mixing_coefficient[iAlt][iCm], 16);
-                        decoded_sample++;
-                        decoded_sample++;
+                        elm.component_mixing_coefficient[iAlt][iCm] = pull_16bits(&payloadBinaryData, "component_mixing_coefficient[iAlt][iCm]"); 
                     } else {elm.component_mixing_coefficient[iAlt][iCm] = 0;}
                 }                
-              } else {decoded_sample++;}
+              } else {
+                pull_bits(&payloadBinaryData, 6, "zero_6bits"); 
+              }
             } else {
                 elm.component_mixing_type[iAlt] = elm.component_mixing_type[0];
                 if (elm.component_mixing_type[0] == 3) {
@@ -550,16 +642,12 @@ void SMPTE_ST2094_50::decodeBinaryToSyntaxElements(std::vector<uint8_t> binary_d
 
             /// Read gain curve function parameters - table C.5
             if ( iAlt == 0 || elm.has_common_curve_params_flag){
-              //elm.gain_curve_interpolation[iAlt] = uint16_t(binary_data[decoded_sample] & 0xC0) >> 6; printDebug("gain_curve_interpolation[iAlt]",elm.gain_curve_interpolation[iAlt], 2);
-              elm.gain_curve_num_control_points_minus_1[iAlt] = uint16_t(binary_data[decoded_sample] & 0xF8) >> 3; printDebug("gain_curve_num_control_points_minus_1[iAlt]",elm.gain_curve_num_control_points_minus_1[iAlt], 5);
-              elm.gain_curve_use_pchip_slope_flag[iAlt]       = uint16_t(binary_data[decoded_sample] & 0x04) >> 2; printDebug("gain_curve_use_pchip_slope_flag[iAlt]",elm.gain_curve_use_pchip_slope_flag[iAlt], 1);
-              decoded_sample++;
+              elm.gain_curve_num_control_points_minus_1[iAlt] = pull_bits(&payloadBinaryData, 5, "gain_curve_num_control_points_minus_1[iAlt]");
+                elm.gain_curve_use_pchip_slope_flag[iAlt] = pull_boolean(&payloadBinaryData, "gain_curve_use_pchip_slope_flag[iAlt]");
+                pull_bits(&payloadBinaryData, 2, "zero_2bits");           
               
               for (uint16_t iCps = 0; iCps < elm.gain_curve_num_control_points_minus_1[iAlt] + 1; iCps++){
-                elm.gain_curve_control_points_x[iAlt][iCps] = (uint16_t(binary_data[decoded_sample]) << 8) + (uint16_t(binary_data[decoded_sample+1]) );
-                printDebug("gain_curve_control_points_x[iAlt][iCps]",elm.gain_curve_control_points_x[iAlt][iCps], 16);
-                decoded_sample++;
-                decoded_sample++;
+                elm.gain_curve_control_points_x[iAlt][iCps] = pull_16bits(&payloadBinaryData, "gain_curve_control_points_x[iAlt][iCps]");
               }
             } else {
               //elm.gain_curve_interpolation[iAlt] = elm.gain_curve_interpolation[0];
@@ -570,26 +658,20 @@ void SMPTE_ST2094_50::decodeBinaryToSyntaxElements(std::vector<uint8_t> binary_d
               }
             }
             for (uint16_t iCps = 0; iCps < elm.gain_curve_num_control_points_minus_1[iAlt] + 1; iCps++) {
-              elm.gain_curve_control_points_y[iAlt][iCps] = (uint16_t(binary_data[decoded_sample]) << 8) + (uint16_t(binary_data[decoded_sample+1]) );
-              printDebug("gain_curve_control_points_y[iAlt][iCps]",elm.gain_curve_control_points_y[iAlt][iCps], 16);
-              decoded_sample++;
-              decoded_sample++;
+                elm.gain_curve_control_points_y[iAlt][iCps] = pull_16bits(&payloadBinaryData, "gain_curve_control_points_y[iAlt][iCps]");
             }
             if (!elm.gain_curve_use_pchip_slope_flag[iAlt]) {
               for (uint16_t iCps = 0; iCps < elm.gain_curve_num_control_points_minus_1[iAlt] + 1; iCps++) {
-                elm.gain_curve_control_points_theta[iAlt][iCps] = (uint16_t(binary_data[decoded_sample]) << 8) + (uint16_t(binary_data[decoded_sample+1]) );
-                printDebug("gain_curve_control_points_theta[iAlt][iCps]",elm.gain_curve_control_points_theta[iAlt][iCps], 16);
-                decoded_sample++;
-                decoded_sample++;
+                elm.gain_curve_control_points_theta[iAlt][iCps] = pull_16bits(&payloadBinaryData, "gain_curve_control_points_theta[iAlt][iCps]");
               }
             }
-
         }
 
     }
-  std::cout << "++++++++++++++++++++++++++++++Syntax Elements Successfully Decoding ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++]\n";
-}
 
+}
+std::cout << "++++++++++++++++++++++++++++++Syntax Elements Successfully Decoding ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++]\n";
+}
 
 // Convert the syntax elements to Metadata Items as described in Clause C.3
 void SMPTE_ST2094_50::convertSyntaxElementsToMetadataItems(){

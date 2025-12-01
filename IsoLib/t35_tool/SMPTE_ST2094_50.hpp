@@ -28,6 +28,13 @@ const float Q_GAIN_CURVE_CONTROL_POINT_Y = 48000.0 / 12.0;
 const float O_GAIN_CURVE_CONTROL_POINT_THETA = 90.0; 
 const float Q_GAIN_CURVE_CONTROL_POINT_THETA = 36000.0 / 180.0; 
 
+
+struct BinaryData{
+    std::vector<uint8_t> payload;
+    uint16_t byteIdx;
+    uint8_t  bitIdx;
+  };
+
 struct GainCurve{
   // std::vector<uint32_t> gainCurveInterpolation; -> not in the spec currently
   uint32_t gainCurveNumControlPoints;
@@ -127,7 +134,7 @@ public:
     void dbgPrintMetadataItems(bool decode);
     // Carrying mechanism information
     std::string keyValue;
-    std::vector<uint8_t> payloadBinaryData;
+    BinaryData payloadBinaryData;
 
 private:
     uint8_t applicationIdentifier;
