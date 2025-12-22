@@ -373,7 +373,7 @@ void SMPTE_ST2094_50::convertMetadataItemsToSyntaxElements(){
       }
 
       // Check if all component mixing uses the same parameters 
-      elm.has_common_mixing_coefficient_flag = true; // Init at true, any mismatch makes it false
+      elm.has_common_component_mix_params_flag = true; // Init at true, any mismatch makes it false
       for (uint16_t iAlt = 1; iAlt < cvt.hatm.numAlternateImages; iAlt++) {
         // Check if any coefficient is different across alterante images
         if (abs(cvt.hatm.cgf[0].cm.componentMixRed       - cvt.hatm.cgf[iAlt].cm.componentMixRed)       > Q_COMPONENT_MIXING_COEFFICIENT || 
@@ -382,7 +382,7 @@ void SMPTE_ST2094_50::convertMetadataItemsToSyntaxElements(){
             abs(cvt.hatm.cgf[0].cm.componentMixMax       - cvt.hatm.cgf[iAlt].cm.componentMixMax)       > Q_COMPONENT_MIXING_COEFFICIENT || 
             abs(cvt.hatm.cgf[0].cm.componentMixMin       - cvt.hatm.cgf[iAlt].cm.componentMixMin)       > Q_COMPONENT_MIXING_COEFFICIENT || 
             abs(cvt.hatm.cgf[0].cm.componentMixComponent - cvt.hatm.cgf[iAlt].cm.componentMixComponent) > Q_COMPONENT_MIXING_COEFFICIENT) {
-          elm.has_common_mixing_coefficient_flag = false;
+          elm.has_common_component_mix_params_flag = false;
           break;
         }
       } 
@@ -391,7 +391,7 @@ void SMPTE_ST2094_50::convertMetadataItemsToSyntaxElements(){
       elm.has_common_curve_params_flag = true;  // Init at true, any mismatch makes it false
       for (uint16_t iAlt = 1; iAlt < cvt.hatm.numAlternateImages; iAlt++) {
         if (cvt.hatm.cgf[0].gc.gainCurveNumControlPoints != cvt.hatm.cgf[iAlt].gc.gainCurveNumControlPoints){
-          elm.has_common_mixing_coefficient_flag = false;
+          elm.has_common_component_mix_params_flag = false;
           break;
         }
       }
@@ -400,7 +400,7 @@ void SMPTE_ST2094_50::convertMetadataItemsToSyntaxElements(){
       for (uint16_t pIdx = 0; pIdx < cvt.hatm.cgf[0].gc.gainCurveNumControlPoints; pIdx++){
         for (uint16_t iAlt = 1; iAlt < cvt.hatm.numAlternateImages; iAlt++) {
           if (cvt.hatm.cgf[0].gc.gainCurveControlPointX[pIdx] - cvt.hatm.cgf[iAlt].gc.gainCurveControlPointX[pIdx] > Q_GAIN_CURVE_CONTROL_POINT_X){
-            elm.has_common_mixing_coefficient_flag = false;
+            elm.has_common_component_mix_params_flag = false;
             break;
           }
         }
@@ -506,7 +506,7 @@ if (elm.has_adaptive_tone_map_flag) {
     if (!elm.use_reference_white_tone_mapping_flag) {
         push_bits(&payloadBinaryData, uint8_t(elm.num_alternate_images)                      , 3, "num_alternate_images");
         push_bits(&payloadBinaryData, uint8_t(elm.gain_application_space_chromaticities_mode), 2, "gain_application_space_chromaticities_mode");
-        push_boolean(&payloadBinaryData, elm.has_common_mixing_coefficient_flag                 , "has_common_mixing_coefficient_flag");
+        push_boolean(&payloadBinaryData, elm.has_common_component_mix_params_flag               , "has_common_component_mix_params_flag");
         push_boolean(&payloadBinaryData, elm.has_common_curve_params_flag                       , "has_common_curve_params_flag");
         if (elm.gain_application_space_chromaticities_mode == 3) {
             for (uint16_t iCh = 0; iCh < 8; iCh++) {
@@ -517,7 +517,7 @@ if (elm.has_adaptive_tone_map_flag) {
         for (uint16_t iAlt = 0; iAlt < elm.num_alternate_images; iAlt++) {
             push_16bits(&payloadBinaryData, elm.alternate_hdr_headrooms[iAlt], "alternate_hdr_headrooms[iAlt]");
             // Write component mixing function parameters
-            if ( iAlt == 0 || !elm.has_common_mixing_coefficient_flag){
+            if ( iAlt == 0 || !elm.has_common_component_mix_params_flag){
                 push_bits(&payloadBinaryData, uint8_t(elm.component_mixing_type[iAlt]), 2, "component_mixing_type[iAlt]");
                 if (elm.component_mixing_type[iAlt] == 3) {
                     // Write the flag to indicate which coefficients are signaled 
@@ -599,7 +599,7 @@ void SMPTE_ST2094_50::decodeBinaryToSyntaxElements(std::vector<uint8_t> binary_d
     if (!elm.use_reference_white_tone_mapping_flag){
         elm.num_alternate_images = pull_bits(&payloadBinaryData, 3, "num_alternate_images");
         elm.gain_application_space_chromaticities_mode = pull_bits(&payloadBinaryData, 2, "gain_application_space_chromaticities_mode");
-        elm.has_common_mixing_coefficient_flag = pull_boolean(&payloadBinaryData, "has_common_mixing_coefficient_flag");
+        elm.has_common_component_mix_params_flag = pull_boolean(&payloadBinaryData, "has_common_component_mix_params_flag");
         elm.has_common_curve_params_flag = pull_boolean(&payloadBinaryData, "has_common_curve_params_flag");  
 
         if (elm.gain_application_space_chromaticities_mode == 3) {
@@ -612,7 +612,7 @@ void SMPTE_ST2094_50::decodeBinaryToSyntaxElements(std::vector<uint8_t> binary_d
             elm.alternate_hdr_headrooms[iAlt] = pull_16bits(&payloadBinaryData, "elm.alternate_hdr_headrooms[iAlt]"); 
 
             // Read component mixing function parameters - Table C.4
-            if ( iAlt == 0 || !elm.has_common_mixing_coefficient_flag){
+            if ( iAlt == 0 || !elm.has_common_component_mix_params_flag){
                 elm.component_mixing_type[iAlt] = pull_bits(&payloadBinaryData, 2, "elm.component_mixing_type[iAlt]");
               if (elm.component_mixing_type[iAlt] == 3) {
                 uint8_t has_component_mixing_coefficient_flag = pull_bits(&payloadBinaryData, 6, "elm.component_mixing_type[iAlt]"); 
