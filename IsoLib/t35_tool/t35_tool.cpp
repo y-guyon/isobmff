@@ -102,10 +102,21 @@ MetadataMap parseMetadataFolder(const std::string& metadataFolder) {
       error_raised = st2094_50.decodeJsonToMetadataItems(j); // decode the json to metadata items
       st2094_50.dbgPrintMetadataItems(false);  // print up to what was decoded from the json
       if (error_raised) {
-        std::cerr << "Skipping " << path << " error decoding json file\n";
+        std::cerr << "ERROR: Skipping " << path << " due to JSON decoding errors.\n";
+        std::cerr << "       Please verify the JSON schema matches the expected format.\n";
+        std::cerr << "       Expected fields: hdrReferenceWhite, baselineHdrHeadroom, numAlternateImages, etc.\n";
         continue;
       }
-      st2094_50.convertMetadataItemsToSyntaxElements();  // print up to what was decoded from the json
+
+      // Convert metadata items to syntax elements with error handling
+      try {
+        st2094_50.convertMetadataItemsToSyntaxElements();
+      } catch (const std::exception& e) {
+        std::cerr << "ERROR: Failed to convert metadata items to syntax elements: " << e.what() << "\n";
+        std::cerr << "       Skipping " << path << "\n";
+        continue;
+      }
+
       st2094_50.writeSyntaxElementsToBinaryData();    
       payloadBinaryData = st2094_50.getPayloadData();
       frame_start       = st2094_50.getTimeIntervalStart();

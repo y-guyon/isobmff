@@ -212,13 +212,21 @@ if (j.contains("frame_start") && j.contains("frame_duration")) {
 
 // Checking mandatory metadata
 if (!j.contains("hdrReferenceWhite") ) {
-  std::cerr <<  "missing mandatory keys: hdrReferenceWhite\n";
-    return error_raised;
+  std::cerr <<  "ERROR: missing mandatory field 'hdrReferenceWhite'\n";
+  std::cerr <<  "Note: Field names are case-sensitive. Check for 'hdrReferenceWhite' (camelCase), not 'hdr_reference_white' (snake_case)\n";
+  error_raised = true;
+  return error_raised;
 }
 
 // ================================================= Decode Metadata Items ===================================
 // get mandatory metadata
-cvt.hdrReferenceWhite       = j["hdrReferenceWhite"].get<float>();
+try {
+  cvt.hdrReferenceWhite = j["hdrReferenceWhite"].get<float>();
+} catch (const std::exception& e) {
+  std::cerr << "ERROR: Failed to parse 'hdrReferenceWhite': " << e.what() << "\n";
+  error_raised = true;
+  return error_raised;
+}
 if (j.contains("baselineHdrHeadroom") )
 {
   isHeadroomAdaptiveToneMap    = true; // if there is a baselineHdrHeadroom then it is a headroom adaptive tone mapping
@@ -333,6 +341,20 @@ void SMPTE_ST2094_50::convertMetadataItemsToSyntaxElements(){
   elm.use_reference_white_tone_mapping_flag = isReferenceWhiteToneMapping;
   if (!elm.use_reference_white_tone_mapping_flag){
     elm.num_alternate_images = uint16_t(cvt.hatm.numAlternateImages);
+
+    // Validate that we have the required data structures
+    if (cvt.hatm.numAlternateImages == 0) {
+      std::cerr << "Error: numAlternateImages is 0, but reference white tone mapping is disabled. Cannot proceed.\n";
+      return;
+    }
+
+    if (cvt.hatm.cgf.size() < cvt.hatm.numAlternateImages) {
+      std::cerr << "Error: cgf array size (" << cvt.hatm.cgf.size()
+                << ") is less than numAlternateImages (" << cvt.hatm.numAlternateImages
+                << "). JSON data is incomplete or malformed.\n";
+      return;
+    }
+
     // Check if the primary combination is known
     if (
       (cvt.hatm.gainApplicationSpaceChromaticities[0] - 0.64  ) <  P_GAIN_APPLICATION_SPACE_CHROMATICITY &&
