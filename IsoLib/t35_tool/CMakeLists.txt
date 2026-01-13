@@ -31,9 +31,10 @@ else()
   add_compile_options(-Wall -Wextra -Wpedantic)
 endif()
 
+# ---- Dependencies ----
+include(FetchContent)
 
 # JSON dependency
-include(FetchContent)
 FetchContent_Declare(
   json
   GIT_REPOSITORY https://github.com/nlohmann/json.git
@@ -49,20 +50,58 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(cli11)
 
-# ---- Executable ----
+# spdlog (logging library)
+FetchContent_Declare(
+  spdlog
+  GIT_REPOSITORY https://github.com/gabime/spdlog.git
+  GIT_TAG        v1.16.0
+)
+FetchContent_MakeAvailable(spdlog)
+
+# ---- Old t35_tool (keep for reference) ----
 add_executable(
-  t35_tool
+  t35_tool_legacy
   t35_tool.cpp
-  SMPTE_ST2094_50.hpp
-  SMPTE_ST2094_50.cpp 
+  sources/SMPTE_ST2094_50.hpp
+  sources/SMPTE_ST2094_50.cpp
 )
 
 # Link libraries
 target_link_libraries(
-  t35_tool
-
+  t35_tool_legacy
   PRIVATE
     libisomediafile
     nlohmann_json::nlohmann_json
     CLI11::CLI11
 )
+
+# ---- New t35_tool (functional with stubs) ----
+add_executable(
+  t35_tool
+  t35_tool_v2.cpp
+  sources/SMPTE_ST2094_50.cpp
+  common/MetadataTypes.cpp
+  common/T35Prefix.cpp
+  common/Logger.cpp
+  sources/MetadataSource.cpp
+  sources/GenericJsonSource.cpp
+  sources/SMPTEFolderSource.cpp
+  injection/InjectionStrategy.cpp
+  injection/MebxIt35Strategy.cpp
+  injection/MebxMe4cStrategy.cpp
+  extraction/ExtractionStrategy.cpp
+  extraction/MebxIt35Extractor.cpp
+  extraction/AutoExtractor.cpp
+)
+
+target_link_libraries(
+  t35_tool
+  PRIVATE
+    libisomediafile
+    nlohmann_json::nlohmann_json
+    CLI11::CLI11
+    spdlog::spdlog
+)
+
+
+

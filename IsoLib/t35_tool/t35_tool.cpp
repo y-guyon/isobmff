@@ -40,7 +40,7 @@ extern "C" {
 // 3rd party headers
 #include <CLI/CLI.hpp>
 #include <nlohmann/json.hpp>
-#include "SMPTE_ST2094_50.hpp" 
+#include "sources/SMPTE_ST2094_50.hpp" 
 
 // Usage shortcuts:
 // - mkdir mybuild && cd mybuild
