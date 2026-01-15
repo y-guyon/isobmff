@@ -295,7 +295,7 @@ static MP4Err buildMetadataDurationsAndSizes( const MetadataMap& items,
   std::sort(sorted.begin(), sorted.end(),
             [](auto& a, auto& b) { return a.first < b.first; });
 
-  // Validate no overlaps
+  // Validate no overlaps and adjust durations if needed
   for (size_t i = 1; i < sorted.size(); ++i) {
     u32 prevEnd = sorted[i - 1].first + sorted[i - 1].second.frame_duration;
     if (sorted[i].first < prevEnd) {
@@ -306,13 +306,33 @@ static MP4Err buildMetadataDurationsAndSizes( const MetadataMap& items,
     }
   }
 
-  // Check coverage using last entry only (since no overlaps)
-  auto& last = sorted.back().second;
-  u32 maxFrame = sorted.back().first + last.frame_duration;
-  if (maxFrame > videoDurations.size()) {
-    std::cerr << "Metadata covers up to frame " << maxFrame
-              << " but video only has " << videoDurations.size() << " samples\n";
-    return MP4BadParamErr;
+  // Check coverage and adjust last entry if needed
+  u32 videoFrameCount = static_cast<u32>(videoDurations.size());
+  for (size_t i = 0; i < sorted.size(); ++i) {
+    auto& [start, item] = sorted[i];
+    u32 requestedEndFrame = start + item.frame_duration;
+    
+    // Check if this metadata extends beyond video duration
+    if (requestedEndFrame > videoFrameCount) {
+      u32 originalDuration = item.frame_duration;
+      u32 adjustedDuration = videoFrameCount - start;
+      
+      if (adjustedDuration == 0) {
+        std::cerr << "Error: Metadata starting at frame " << start 
+                  << " is beyond video duration (" << videoFrameCount << " frames)\n";
+        return MP4BadParamErr;
+      }
+      
+      std::cerr << "Warning: Metadata at frame " << start 
+                << " extends beyond video duration.\n"
+                << "         Requested end frame: " << requestedEndFrame 
+                << ", video has " << videoFrameCount << " frames\n"
+                << "         Adjusting frame_duration from " << originalDuration 
+                << " to " << adjustedDuration << " frames\n";
+      
+      // Modify the item's frame_duration
+      sorted[i].second.frame_duration = adjustedDuration;
+    }
   }
 
   // Compute metadata sample durations and sizes
