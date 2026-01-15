@@ -1,4 +1,5 @@
 #include "DedicatedIt35Extractor.hpp"
+#include "../sources/SMPTE_ST2094_50.hpp"
 #include "../common/Logger.hpp"
 #include "../common/T35Prefix.hpp"
 
@@ -258,6 +259,17 @@ MP4Err DedicatedIt35Extractor::extract(const ExtractionConfig& config) {
             if (frameDuration == 0) frameDuration = 1;
         }
 
+        // Decode the metadata if they are SMPTE ST 2094-50
+        if (config.t35Prefix == "B500900001:SMPTE-ST2094-50") {
+            SMPTE_ST2094_50 st2094_50;
+            std::vector<uint8_t> binaryData(sampleSize);
+            std::memcpy(binaryData.data(), *sampleH, sampleSize);
+            
+            st2094_50.decodeBinaryToSyntaxElements(binaryData);
+            st2094_50.convertSyntaxElementsToMetadataItems();
+            st2094_50.dbgPrintMetadataItems(true);  // Print decoded metadata from bitstream
+        }
+
         // Write binary file
         fs::path binFile = outDir / ("metadata_" + std::to_string(i) + ".bin");
         std::ofstream out(binFile, std::ios::binary);
@@ -267,6 +279,17 @@ MP4Err DedicatedIt35Extractor::extract(const ExtractionConfig& config) {
             return MP4IOErr;
         }
 
+        // Decode the metadata if they are SMPTE ST 2094-50
+        if (config.t35Prefix == "B500900001:SMPTE-ST2094-50") {
+            SMPTE_ST2094_50 st2094_50;
+            std::vector<uint8_t> binaryData(sampleSize);
+            std::memcpy(binaryData.data(), *sampleH, sampleSize);
+            
+            st2094_50.decodeBinaryToSyntaxElements(binaryData);
+            st2094_50.convertSyntaxElementsToMetadataItems();
+            st2094_50.dbgPrintMetadataItems(true);  // Print decoded metadata from bitstream
+        }
+        
         // Samples are raw payloads (no box wrapper)
         out.write((char*)*sampleH, sampleSize);
         out.close();

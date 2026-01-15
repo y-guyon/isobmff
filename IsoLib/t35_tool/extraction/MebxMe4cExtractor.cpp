@@ -1,4 +1,5 @@
 #include "MebxMe4cExtractor.hpp"
+#include "../sources/SMPTE_ST2094_50.hpp"
 #include "../common/Logger.hpp"
 #include "../common/T35Prefix.hpp"
 
@@ -399,6 +400,17 @@ MP4Err MebxMe4cExtractor::extract(const ExtractionConfig& config) {
 
         out.write((char*)*sampleH, sampleSize);
         out.close();
+
+        // Decode the metadata if they are SMPTE ST 2094-50
+        if (config.t35Prefix == "B500900001:SMPTE-ST2094-50") {
+            SMPTE_ST2094_50 st2094_50;
+            std::vector<uint8_t> binaryData(sampleSize);
+            std::memcpy(binaryData.data(), *sampleH, sampleSize);
+            
+            st2094_50.decodeBinaryToSyntaxElements(binaryData);
+            st2094_50.convertSyntaxElementsToMetadataItems();
+            st2094_50.dbgPrintMetadataItems(true);  // Print decoded metadata from bitstream
+        }
 
         LOG_INFO("Extracted sample {}: {} bytes, DTS={}, duration={} (frame {})",
                 i, sampleSize, dts, sampleDuration, currentFrame);

@@ -1,4 +1,5 @@
 #include "MebxIt35Extractor.hpp"
+#include "../sources/SMPTE_ST2094_50.hpp"
 #include "../common/Logger.hpp"
 
 extern "C" {
@@ -226,7 +227,8 @@ MP4Err MebxIt35Extractor::extract(const ExtractionConfig& config) {
     u32 sampleCount = 0;
     u32 currentFrame = 0;
 
-    for (u32 i = 1; ; ++i) {
+    for (u32 i = 1; i <= sampleCount; ++i) {
+        LOG_INFO("Test2");
         MP4Handle sampleH = nullptr;
         u32 sampleSize = 0, sampleFlags = 0, sampleDuration = 0;
         s32 dts = 0, cts = 0;
@@ -277,6 +279,17 @@ MP4Err MebxIt35Extractor::extract(const ExtractionConfig& config) {
             MP4DisposeHandle(sampleH);
             MP4DisposeTrackReader(mebxReader);
             return MP4IOErr;
+        }
+
+        // Decode the metadata if they are SMPTE ST 2094-50
+        if (config.t35Prefix == "B500900001:SMPTE-ST2094-50") {
+            SMPTE_ST2094_50 st2094_50;
+            std::vector<uint8_t> binaryData(sampleSize);
+            std::memcpy(binaryData.data(), *sampleH, sampleSize);
+            
+            st2094_50.decodeBinaryToSyntaxElements(binaryData);
+            st2094_50.convertSyntaxElementsToMetadataItems();
+            st2094_50.dbgPrintMetadataItems(true);  // Print decoded metadata from bitstream
         }
 
         out.write((char*)*sampleH, sampleSize);
