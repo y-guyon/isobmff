@@ -1766,9 +1766,9 @@ extern "C"
   /**
    * @brief Select the first matching 'mebx' key for a track reader by namespace and value.
    *
-   * Looks up the first key in the 'mebx' sample description matching @p key_namespace and @p key_value.
-   * If found, sets the corresponding local_key_id on the reader. Optionally returns the resolved
-   * local_key_id.
+   * Looks up the first key in the 'mebx' sample description matching @p key_namespace and @p
+   * key_value. If found, sets the corresponding local_key_id on the reader. Optionally returns the
+   * resolved local_key_id.
    *
    * If multiple keys match the same namespace and value, this function selects only the first one.
    * Use MP4FindMebxKeyMatchByIndex to iterate through all matches.
@@ -1797,7 +1797,8 @@ extern "C"
    * @param key_namespace Namespace to match
    * @param key_value Handle containing the key value to match
    * @param matchIndex Zero-based index of which match to return (0=first match, 1=second, etc.)
-   * @param outAbsoluteIndex Output: absolute index in metadata config array (for use with ISOGetMebxMetadataConfig)
+   * @param outAbsoluteIndex Output: absolute index in metadata config array (for use with
+   * ISOGetMebxMetadataConfig)
    * @param outLocalKeyId Output: local_key_id for this match
    * @return MP4NoErr if match found, MP4NotFoundErr if matchIndex exceeds available matches
    */

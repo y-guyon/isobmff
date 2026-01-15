@@ -2448,15 +2448,14 @@ ISONewT35MetadataTrack(MP4Movie theMovie, u32 timescale, const char *t35_prefix_
                        MP4Media *outMedia)
 {
   MP4Err err;
-  MP4Track trakM                        = NULL;
-  MP4Media mediaM                       = NULL;
-  MP4T35MetadataSampleEntryPtr it35     = NULL;
-  MP4Handle sampleEntryH                = NULL;
-  MP4PrivateMovieRecordPtr moov         = NULL;
-  MP4TrackAtomPtr trakAtom              = NULL;
+  MP4Track trakM                    = NULL;
+  MP4Media mediaM                   = NULL;
+  MP4T35MetadataSampleEntryPtr it35 = NULL;
+  MP4Handle sampleEntryH            = NULL;
+  MP4PrivateMovieRecordPtr moov     = NULL;
+  MP4TrackAtomPtr trakAtom          = NULL;
 
-  if(theMovie == NULL || t35_prefix_text == NULL || outTrack == NULL)
-    BAILWITHERROR(MP4BadParamErr);
+  if(theMovie == NULL || t35_prefix_text == NULL || outTrack == NULL) BAILWITHERROR(MP4BadParamErr);
 
   moov = (MP4PrivateMovieRecordPtr)theMovie;
 
@@ -2513,4 +2512,3 @@ bail:
   TEST_RETURN(err);
   return err;
 }
-

@@ -317,7 +317,7 @@ MP4SelectFirstMebxTrackReaderKey(MP4TrackReader theReader, u32 key_namespace, MP
       {
         /* Found first match - save it and stop searching */
         found_local_id = local_id;
-        found = 1;
+        found          = 1;
         MP4DisposeHandle(valH);
         break;
       }
@@ -348,9 +348,9 @@ MP4_EXTERN(MP4Err)
 MP4FindMebxKeyMatchByIndex(MP4Handle sampleEntryH, u32 key_namespace, MP4Handle key_value,
                            u32 matchIndex, u32 *outAbsoluteIndex, u32 *outLocalKeyId)
 {
-  MP4Err err         = MP4NoErr;
-  u32 key_cnt        = 0;
-  u32 found_count    = 0;
+  MP4Err err      = MP4NoErr;
+  u32 key_cnt     = 0;
+  u32 found_count = 0;
 
   if((sampleEntryH == NULL) || (key_value == NULL)) BAILWITHERROR(MP4BadParamErr);
 
