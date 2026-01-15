@@ -187,6 +187,8 @@ add_library(
     src/SubSampleInformationAtom.c
     src/SubsegmentIndexAtom.c
     src/SyncSampleAtom.c
+    src/T35CommonHeaderBox.c
+    src/T35MetadataSampleEntry.c
     src/TextMetaSampleEntry.c
     src/TimeToSampleAtom.c
     src/TrackAtom.c
