@@ -91,7 +91,7 @@ static MP4Err findIt35MetadataTrack(MP4Movie moov,
         return MP4NoErr;
     }
 
-    LOG_ERROR("No IT35 metadata track found");
+    LOG_ERROR("No 'it35' metadata track found");
     return MP4NotFoundErr;
 }
 

@@ -211,12 +211,14 @@ int doExtract(const std::string& inputFile,
         config.outputPath = outputPath;
         config.t35Prefix = prefix.toString(); // Use full string with description
 
-        // Check if can extract
-        std::string reason;
-        if (!strategy->canExtract(config, reason)) {
-            LOG_ERROR("Cannot extract with '{}': {}", methodName, reason);
-            MP4DisposeMovie(movie);
-            return 1;
+        // Only validate for non-auto strategies (auto tries all strategies internally)
+        if (methodName != "auto") {
+            std::string reason;
+            if (!strategy->canExtract(config, reason)) {
+                LOG_ERROR("Cannot extract with '{}': {}", methodName, reason);
+                MP4DisposeMovie(movie);
+                return 1;
+            }
         }
 
         // Extract

@@ -1,5 +1,6 @@
 #include "ExtractionStrategy.hpp"
 #include "MebxIt35Extractor.hpp"
+#include "MebxMe4cExtractor.hpp"
 #include "DedicatedIt35Extractor.hpp"
 #include "AutoExtractor.hpp"
 #include "../common/Logger.hpp"
@@ -13,10 +14,11 @@ std::unique_ptr<ExtractionStrategy> createExtractionStrategy(const std::string& 
         return std::make_unique<AutoExtractor>();
     } else if (strategyName == "mebx-it35") {
         return std::make_unique<MebxIt35Extractor>();
+    } else if (strategyName == "mebx-me4c") {
+        return std::make_unique<MebxMe4cExtractor>();
     } else if (strategyName == "dedicated-it35") {
         return std::make_unique<DedicatedIt35Extractor>();
-    } else if (strategyName == "mebx-me4c" ||
-               strategyName == "sample-group" ||
+    } else if (strategyName == "sample-group" ||
                strategyName == "sample-entry-box" ||
                strategyName == "sei") {
         throw T35Exception(T35Error::NotImplemented,
