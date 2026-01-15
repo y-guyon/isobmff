@@ -2,6 +2,14 @@
 
 #include "ExtractionStrategy.hpp"
 
+// Forward declarations from libisomediafile
+extern "C" {
+struct MP4TrackReaderRecord;
+typedef struct MP4TrackReaderRecord* MP4TrackReader;
+struct MP4TrackRecord;
+typedef struct MP4TrackRecord* MP4Track;
+}
+
 namespace t35 {
 
 /**
@@ -11,7 +19,7 @@ namespace t35 {
 class MebxIt35Extractor : public ExtractionStrategy {
 public:
     MebxIt35Extractor() = default;
-    virtual ~MebxIt35Extractor() = default;
+    virtual ~MebxIt35Extractor();
 
     std::string getName() const override { return "mebx-it35"; }
 
@@ -23,6 +31,13 @@ public:
                    std::string& reason) override;
 
     MP4Err extract(const ExtractionConfig& config) override;
+
+private:
+    // Cache the reader and track found in canExtract() for use in extract()
+    MP4TrackReader m_cachedReader = nullptr;
+    MP4Track m_cachedTrack = nullptr;
+
+    void clearCache();
 };
 
 } // namespace t35

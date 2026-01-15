@@ -13,6 +13,16 @@ extern "C" {
 
 namespace t35 {
 
+// DedicatedIt35Extractor implementation
+
+DedicatedIt35Extractor::~DedicatedIt35Extractor() {
+    clearCache();
+}
+
+void DedicatedIt35Extractor::clearCache() {
+    m_cachedTrack = nullptr;
+}
+
 // Helper: Find dedicated IT35 metadata track with matching T.35 prefix
 static MP4Err findIt35MetadataTrack(MP4Movie moov,
                                      const std::string& t35PrefixStr,
@@ -134,9 +144,11 @@ bool DedicatedIt35Extractor::canExtract(const ExtractionConfig& config,
         return false;
     }
 
-    // Try to find IT35 track
-    MP4Track track = nullptr;
-    MP4Err err = findIt35MetadataTrack(config.movie, config.t35Prefix, &track);
+    // Clear any previous cache
+    clearCache();
+
+    // Find and cache the track
+    MP4Err err = findIt35MetadataTrack(config.movie, config.t35Prefix, &m_cachedTrack);
 
     if (err) {
         reason = "No dedicated IT35 metadata track found";
@@ -154,12 +166,21 @@ MP4Err DedicatedIt35Extractor::extract(const ExtractionConfig& config) {
     MP4Err err = MP4NoErr;
     MP4Track it35Track = nullptr;
 
-    // Find IT35 track
-    LOG_DEBUG("Finding IT35 track");
-    err = findIt35MetadataTrack(config.movie, config.t35Prefix, &it35Track);
-    if (err) {
-        LOG_ERROR("Failed to find IT35 track (err={})", err);
-        return err;
+    // Use cached track if available (from canExtract), otherwise find it now
+    if (m_cachedTrack) {
+        LOG_DEBUG("Using cached IT35 track");
+        it35Track = m_cachedTrack;
+
+        // Clear cache so we don't reuse it by mistake
+        m_cachedTrack = nullptr;
+    } else {
+        // Fallback: extract() called without canExtract()
+        LOG_DEBUG("Finding IT35 track (cache not available)");
+        err = findIt35MetadataTrack(config.movie, config.t35Prefix, &it35Track);
+        if (err) {
+            LOG_ERROR("Failed to find IT35 track (err={})", err);
+            return err;
+        }
     }
 
     // Get media and timescale

@@ -12,6 +12,20 @@ extern "C" {
 
 namespace t35 {
 
+// MebxIt35Extractor implementation
+
+MebxIt35Extractor::~MebxIt35Extractor() {
+    clearCache();
+}
+
+void MebxIt35Extractor::clearCache() {
+    if (m_cachedReader) {
+        MP4DisposeTrackReader(m_cachedReader);
+        m_cachedReader = nullptr;
+    }
+    m_cachedTrack = nullptr;
+}
+
 // Helper: Find mebx track with it35 namespace and matching T.35 prefix
 static MP4Err findMebxTrackReader(MP4Movie moov,
                                    const std::string& t35PrefixStr,
@@ -142,13 +156,11 @@ bool MebxIt35Extractor::canExtract(const ExtractionConfig& config,
         return false;
     }
 
-    // Try to find mebx track
-    MP4TrackReader reader = nullptr;
-    MP4Err err = findMebxTrackReader(config.movie, config.t35Prefix, &reader, nullptr);
+    // Clear any previous cache
+    clearCache();
 
-    if (reader) {
-        MP4DisposeTrackReader(reader);
-    }
+    // Find and cache the reader
+    MP4Err err = findMebxTrackReader(config.movie, config.t35Prefix, &m_cachedReader, &m_cachedTrack);
 
     if (err) {
         reason = "No mebx track with it35 namespace found";
@@ -167,12 +179,23 @@ MP4Err MebxIt35Extractor::extract(const ExtractionConfig& config) {
     MP4TrackReader mebxReader = nullptr;
     MP4Track mebxTrack = nullptr;
 
-    // Find mebx track
-    LOG_DEBUG("Finding mebx track");
-    err = findMebxTrackReader(config.movie, config.t35Prefix, &mebxReader, &mebxTrack);
-    if (err) {
-        LOG_ERROR("Failed to find mebx track (err={})", err);
-        return err;
+    // Use cached reader if available (from canExtract), otherwise find it now
+    if (m_cachedReader) {
+        LOG_DEBUG("Using cached mebx it35 track reader");
+        mebxReader = m_cachedReader;
+        mebxTrack = m_cachedTrack;
+
+        // Clear cache so we don't double-dispose
+        m_cachedReader = nullptr;
+        m_cachedTrack = nullptr;
+    } else {
+        // Fallback: extract() called without canExtract()
+        LOG_DEBUG("Finding mebx it35 track (cache not available)");
+        err = findMebxTrackReader(config.movie, config.t35Prefix, &mebxReader, &mebxTrack);
+        if (err) {
+            LOG_ERROR("Failed to find mebx track (err={})", err);
+            return err;
+        }
     }
 
     // Get timescale
