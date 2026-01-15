@@ -3,6 +3,7 @@
 #include "MebxMe4cExtractor.hpp"
 #include "DedicatedIt35Extractor.hpp"
 #include "AutoExtractor.hpp"
+#include "SampleGroupExtractor.hpp"
 #include "../common/Logger.hpp"
 
 namespace t35 {
@@ -18,8 +19,9 @@ std::unique_ptr<ExtractionStrategy> createExtractionStrategy(const std::string& 
         return std::make_unique<MebxMe4cExtractor>();
     } else if (strategyName == "dedicated-it35") {
         return std::make_unique<DedicatedIt35Extractor>();
-    } else if (strategyName == "sample-group" ||
-               strategyName == "sei") {
+    } else if (strategyName == "sample-group") {
+        return std::make_unique<SampleGroupExtractor>();
+    } else if (strategyName == "sei") {
         throw T35Exception(T35Error::NotImplemented,
                           "Extraction strategy '" + strategyName + "' is not yet implemented");
     } else {

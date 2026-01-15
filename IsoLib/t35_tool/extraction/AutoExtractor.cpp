@@ -2,6 +2,7 @@
 #include "MebxIt35Extractor.hpp"
 #include "MebxMe4cExtractor.hpp"
 #include "DedicatedIt35Extractor.hpp"
+#include "SampleGroupExtractor.hpp"
 #include "../common/Logger.hpp"
 
 namespace t35 {
@@ -13,6 +14,7 @@ bool AutoExtractor::canExtract(const ExtractionConfig& config,
     extractors.push_back(std::make_unique<DedicatedIt35Extractor>());
     extractors.push_back(std::make_unique<MebxIt35Extractor>());
     extractors.push_back(std::make_unique<MebxMe4cExtractor>());
+    extractors.push_back(std::make_unique<SampleGroupExtractor>());
 
     for (const auto& extractor : extractors) {
         std::string extractorReason;
@@ -22,7 +24,7 @@ bool AutoExtractor::canExtract(const ExtractionConfig& config,
         }
     }
 
-    reason = "No compatible metadata tracks found (tried: dedicated-it35, mebx-it35, mebx-me4c)";
+    reason = "No compatible metadata tracks found (tried: dedicated-it35, mebx-it35, mebx-me4c, sample-group)";
     return false;
 }
 
@@ -34,6 +36,7 @@ MP4Err AutoExtractor::extract(const ExtractionConfig& config) {
     extractors.push_back(std::make_unique<DedicatedIt35Extractor>());
     extractors.push_back(std::make_unique<MebxIt35Extractor>());
     extractors.push_back(std::make_unique<MebxMe4cExtractor>());
+    extractors.push_back(std::make_unique<SampleGroupExtractor>());
 
     for (auto& extractor : extractors) {
         std::string reason;
@@ -47,7 +50,7 @@ MP4Err AutoExtractor::extract(const ExtractionConfig& config) {
 
     LOG_ERROR("No compatible extraction strategy found");
     throw T35Exception(T35Error::ExtractionFailed,
-                       "No compatible metadata tracks found (tried: dedicated-it35, mebx-it35, mebx-me4c)");
+                       "No compatible metadata tracks found (tried: dedicated-it35, mebx-it35, mebx-me4c, sample-group)");
 }
 
 } // namespace t35

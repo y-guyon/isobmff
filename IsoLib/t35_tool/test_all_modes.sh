@@ -34,6 +34,7 @@ INJECTION_MODES=(
     "mebx-it35"
     "mebx-me4c"
     "dedicated-it35"
+    "sample-group"
 )
 
 # Results tracking (simple arrays instead of associative array)

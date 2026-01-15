@@ -2,6 +2,7 @@
 #include "MebxIt35Strategy.hpp"
 #include "MebxMe4cStrategy.hpp"
 #include "DedicatedIt35Strategy.hpp"
+#include "SampleGroupStrategy.hpp"
 #include "../common/Logger.hpp"
 
 namespace t35 {
@@ -15,8 +16,9 @@ std::unique_ptr<InjectionStrategy> createInjectionStrategy(const std::string& st
         return std::make_unique<MebxMe4cStrategy>();
     } else if (strategyName == "dedicated-it35") {
         return std::make_unique<DedicatedIt35Strategy>();
-    } else if (strategyName == "sample-group" ||
-               strategyName == "default-sample-group") {
+    } else if (strategyName == "sample-group") {
+        return std::make_unique<SampleGroupStrategy>();
+    } else if (strategyName == "sei") {
         throw T35Exception(T35Error::NotImplemented,
                           "Injection strategy '" + strategyName + "' is not yet implemented");
     } else {
