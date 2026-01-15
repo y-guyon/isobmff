@@ -2408,3 +2408,108 @@ bail:
   if(entry) entry->destroy((MP4AtomPtr)entry);
   return err;
 }
+
+/* ==================== T.35 Metadata Track Functions ==================== */
+
+MP4_EXTERN(MP4Err)
+ISONewT35SampleDescription(MP4T35MetadataSampleEntryPtr *outSE, u32 dataReferenceIndex,
+                           const char *t35_prefix_text)
+{
+  MP4Err err;
+  MP4T35MetadataSampleEntryPtr it35;
+  MP4T35CommonHeaderBoxPtr t35c;
+
+  if(outSE == NULL || t35_prefix_text == NULL) BAILWITHERROR(MP4BadParamErr);
+
+  err = MP4CreateT35MetadataSampleEntry(&it35);
+  if(err) goto bail;
+  it35->dataReferenceIndex = dataReferenceIndex;
+
+  err = MP4CreateT35CommonHeaderBox(&t35c);
+  if(err) goto bail;
+
+  err = MP4SetT35CommonHeaderBoxText(t35c, t35_prefix_text);
+  if(err) goto bail;
+
+  err = MP4AddListEntry((void *)t35c, it35->ExtensionAtomList);
+  if(err) goto bail;
+  it35->t35_prefix_box = t35c;
+
+  *outSE = it35;
+
+bail:
+  TEST_RETURN(err);
+  return err;
+}
+
+ISO_EXTERN(ISOErr)
+ISONewT35MetadataTrack(MP4Movie theMovie, u32 timescale, const char *t35_prefix_text,
+                       MP4Track videoTrack, MP4Track *outTrack, MP4Media *outMedia)
+{
+  MP4Err err;
+  MP4Track trakM                        = NULL;
+  MP4Media mediaM                       = NULL;
+  MP4T35MetadataSampleEntryPtr it35     = NULL;
+  MP4Handle sampleEntryH                = NULL;
+  MP4PrivateMovieRecordPtr moov         = NULL;
+  MP4TrackAtomPtr trakAtom              = NULL;
+
+  if(theMovie == NULL || t35_prefix_text == NULL || outTrack == NULL)
+    BAILWITHERROR(MP4BadParamErr);
+
+  moov = (MP4PrivateMovieRecordPtr)theMovie;
+
+  /* Create metadata track */
+  err = MP4NewMovieTrack(theMovie, MP4NewTrackIsMetadata, &trakM);
+  if(err) goto bail;
+
+  /* Create media with MP4MetaHandlerType */
+  err = MP4NewTrackMedia(trakM, &mediaM, MP4MetaHandlerType, timescale, NULL);
+  if(err) goto bail;
+
+  /* Add track reference to video track if provided */
+  if(videoTrack != NULL)
+  {
+    err = MP4AddTrackReference(trakM, videoTrack, MP4_FOUR_CHAR_CODE('r', 'n', 'd', 'r'), 0);
+    if(err) goto bail;
+  }
+
+  /* Create T35 sample entry with t35C box */
+  err = ISONewT35SampleDescription(&it35, 1, t35_prefix_text);
+  if(err) goto bail;
+
+  /* Convert sample entry to handle */
+  err = MP4NewHandle(0, &sampleEntryH);
+  if(err) goto bail;
+
+  /* Use atomPtrToSampleEntryH helper */
+  err = atomPtrToSampleEntryH(sampleEntryH, (MP4AtomPtr)it35);
+  if(err) goto bail;
+
+  /* Add sample entry to media (index 0 means add to sample description table) */
+  err = MP4AddMediaSamples(mediaM, 0, 0, 0, 0, sampleEntryH, 0, 0);
+  if(err) goto bail;
+
+  /* Dispose the handle after adding */
+  MP4DisposeHandle(sampleEntryH);
+  sampleEntryH = NULL;
+
+  /* Set the mdat reference for the track */
+  trakAtom = (MP4TrackAtomPtr)trakM;
+  if(trakAtom && moov->mdat)
+  {
+    err = trakAtom->setMdat(trakAtom, moov->mdat);
+    if(err) goto bail;
+  }
+
+  *outTrack = trakM;
+  if(outMedia) *outMedia = mediaM;
+
+bail:
+  if(sampleEntryH) MP4DisposeHandle(sampleEntryH);
+  if(it35) it35->destroy((MP4AtomPtr)it35);
+
+  TEST_RETURN(err);
+  return err;
+}
+

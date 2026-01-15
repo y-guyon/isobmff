@@ -63,6 +63,7 @@ extern "C"
 #define ISOOpenMovieInPlace MP4OpenMovieInPlace
 
   struct MP4BoxedMetadataSampleEntry;
+  struct MP4T35MetadataSampleEntry;
 
   /**
    * @brief constants for the graphics modes (e.g. for MJ2SetMediaGraphicsMode)
@@ -823,6 +824,51 @@ extern "C"
   ISO_EXTERN(ISOErr)
   ISOGetMebxMetadataConfig(MP4Handle sampleEntryH, u32 idx, u32 *local_key_id, u32 *key_namespace,
                            MP4Handle key_value, char **locale_string, MP4Handle setupInfo);
+
+  /*************************************************************************************************
+   * T.35 Metadata Track Functions
+   ************************************************************************************************/
+
+  /**
+   * @brief Create a new T.35 metadata sample entry.
+   * @ingroup SampleDescr
+   *
+   * Creates a T35MetadataSampleEntry ('it35') with a T35CommonHeaderBox ('t35C') containing
+   * the specified T.35 prefix text.
+   *
+   * @param outSE Output; receives the created T35MetadataSampleEntry.
+   * @param dataReferenceIndex Data reference index (typically 1 for self-contained media).
+   * @param t35_prefix_text UTF-8 string conforming to format: T35Prefix[:T35Description]
+   *                        where T35Prefix is even number of uppercase hex digits (0-9, A-F).
+   *                        Example: "B500900001:SMPTE-ST2094-50"
+   * @return MP4Err code: MP4NoErr on success, MP4BadParamErr if validation fails.
+   */
+  MP4_EXTERN(MP4Err)
+  ISONewT35SampleDescription(struct MP4T35MetadataSampleEntry **outSE, u32 dataReferenceIndex,
+                             const char *t35_prefix_text);
+
+  /**
+   * @brief Create a complete T.35 timed metadata track.
+   * @ingroup Tracks
+   *
+   * Convenience function that creates a metadata track with MP4MetaHandlerType,
+   * adds a T35MetadataSampleEntry with the specified T.35 prefix, and optionally
+   * adds a track reference to a video track using the 'rndr' reference type.
+   *
+   * After calling this function, use MP4AddMediaSample() or similar functions to
+   * add T.35 metadata samples to the track.
+   *
+   * @param theMovie Input movie object.
+   * @param timescale Media timescale (typically matches video track timescale).
+   * @param t35_prefix_text UTF-8 T.35 prefix string (e.g., "B500900001:SMPTE-ST2094-50").
+   * @param videoTrack Optional video track for 'rndr' reference (NULL if not needed).
+   * @param outTrack Output; receives the created metadata track.
+   * @param outMedia Optional output; receives the created media (NULL if not needed).
+   * @return ISOErr code: MP4NoErr on success, error code otherwise.
+   */
+  ISO_EXTERN(ISOErr)
+  ISONewT35MetadataTrack(MP4Movie theMovie, u32 timescale, const char *t35_prefix_text,
+                         MP4Track videoTrack, MP4Track *outTrack, MP4Media *outMedia);
 
   /*************************************************************************************************
    * VVC Sample descriptions
