@@ -1,0 +1,69 @@
+ {
+  "hdrReferenceWhite": 203,
+  "baselineHdrHeadroom": 3,
+  "gainApplicationSpaceChromaticities": [
+    0.708,
+    0.292,
+    0.17,
+    0.797,
+    0.131,
+    0.046,
+    0.3127,
+    0.329
+  ],
+  "numAlternateImages": 1,
+  "alternateHdrHeadroom": [
+    0
+  ],
+  "componentMixRed": [
+    0
+  ],
+  "componentMixGreen": [
+    0
+  ],
+  "componentMixBlue": [
+    0
+  ],
+  "componentMixMax": [
+    1
+  ],
+  "componentMixMin": [
+    0
+  ],
+  "componentMixComponent": [
+    0
+  ],
+  "gainCurveNumControlPoints": [8],
+  "gainCurveControlPointX": [[
+    1,
+    1.4081632653061225,
+    2.0136054421768708,
+    2.8163265306122449,
+    3.8163265306122445,
+    5.0136054421768712,
+    6.408163265306122,
+    8
+  ]],
+  "gainCurveControlPointY": [[
+    0,
+    -0.11605812946357674,
+    -0.3514723705013777,
+    -0.61667136044849458,
+    -0.87919152815854418,
+    -1.1289160279132113,
+    -1.3638834113287408,
+    -1.5849625007211563
+  ]],
+  "gainCurveControlPointTheta": [[
+    0,
+    -21.360639562158294,
+    -20.183728227645798,
+    -16.482814978349385,
+    -13.159349837366165,
+    -10.592030227349737,
+    -8.6729607628430276,
+    -7.2376931620664
+  ]],
+  "frame_start": 3,
+  "frame_duration": 1
+}

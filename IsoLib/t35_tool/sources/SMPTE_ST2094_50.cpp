@@ -15,7 +15,7 @@
 #define LOGLEVEL_TRACE 5
 
 // Global verbose level for this compilation unit
-static int g_verboseLevel = LOGLEVEL_INFO;
+static int g_verboseLevel = LOGLEVEL_TRACE;
 
 // Local logging function - concatenates format and outputs to stdout
 static void logMsg(int logLvl, const char* format, ...) {
@@ -220,8 +220,8 @@ SMPTE_ST2094_50::SMPTE_ST2094_50(){
     }
     
     // Initialize verbose level to INFO (default)
-    verboseLevel = LOGLEVEL_INFO;
-    g_verboseLevel = LOGLEVEL_INFO;  // Also set the global
+    verboseLevel = LOGLEVEL_TRACE;
+    g_verboseLevel = LOGLEVEL_TRACE;  // Also set the global
 }
 
 // Getters
@@ -377,174 +377,177 @@ return error_raised;
 // Convert metadata items to syntax elements 
 void SMPTE_ST2094_50::convertMetadataItemsToSyntaxElements(){
   elm.has_custom_hdr_reference_white_flag = false;
+  elm.has_adaptive_tone_map_flag = false;
   if (abs(cvt.hdrReferenceWhite - 203.0) > Q_HDR_REFERENCE_WHITE / 2) {
     elm.has_custom_hdr_reference_white_flag = true;
     elm.hdr_reference_white = uint16_t(cvt.hdrReferenceWhite * Q_HDR_REFERENCE_WHITE);
   }
-  elm.has_adaptive_tone_map_flag = isHeadroomAdaptiveToneMap;
-  if (elm.has_adaptive_tone_map_flag){
+  if (isHeadroomAdaptiveToneMap){
+    elm.has_adaptive_tone_map_flag = true;
+    elm.use_reference_white_tone_mapping_flag = true;
     elm.baseline_hdr_headroom = uint16_t(cvt.hatm.baselineHdrHeadroom * Q_HDR_HEADROOM);
-  }
-  elm.use_reference_white_tone_mapping_flag = isReferenceWhiteToneMapping;
-  if (!elm.use_reference_white_tone_mapping_flag){
-    elm.num_alternate_images = uint16_t(cvt.hatm.numAlternateImages);
+    elm.use_reference_white_tone_mapping_flag = isReferenceWhiteToneMapping;
+    if (!isReferenceWhiteToneMapping){
+      elm.use_reference_white_tone_mapping_flag = false;
+      elm.num_alternate_images = uint16_t(cvt.hatm.numAlternateImages);
 
-    // Validate that we have the required data structures
-    if (cvt.hatm.numAlternateImages == 0) {
-      logMsg(LOGLEVEL_ERROR, "numAlternateImages is 0, but reference white tone mapping is disabled. Cannot proceed.");
-      return;
-    }
-
-    if (cvt.hatm.cgf.size() < cvt.hatm.numAlternateImages) {
-      logMsg(LOGLEVEL_ERROR, "cgf array size (%zu) is less than numAlternateImages (%u). JSON data is incomplete or malformed.", cvt.hatm.cgf.size(), cvt.hatm.numAlternateImages);
-      return;
-    }
-
-    // Check if the primary combination is known
-    if (
-      (cvt.hatm.gainApplicationSpaceChromaticities[0] - 0.64  ) <  P_GAIN_APPLICATION_SPACE_CHROMATICITY &&
-      (cvt.hatm.gainApplicationSpaceChromaticities[1] - 0.33  ) <  P_GAIN_APPLICATION_SPACE_CHROMATICITY &&
-      (cvt.hatm.gainApplicationSpaceChromaticities[2] - 0.30  ) <  P_GAIN_APPLICATION_SPACE_CHROMATICITY &&
-      (cvt.hatm.gainApplicationSpaceChromaticities[3] - 0.60  ) <  P_GAIN_APPLICATION_SPACE_CHROMATICITY &&
-      (cvt.hatm.gainApplicationSpaceChromaticities[4] - 0.15  ) <  P_GAIN_APPLICATION_SPACE_CHROMATICITY &&
-      (cvt.hatm.gainApplicationSpaceChromaticities[5] - 0.06  ) <  P_GAIN_APPLICATION_SPACE_CHROMATICITY &&
-      (cvt.hatm.gainApplicationSpaceChromaticities[6] - 0.3127) <  P_GAIN_APPLICATION_SPACE_CHROMATICITY &&
-      (cvt.hatm.gainApplicationSpaceChromaticities[7] - 0.3290) < P_GAIN_APPLICATION_SPACE_CHROMATICITY){ 
-        elm.gain_application_space_chromaticities_mode = 0;
-      } 
-      else if (
-        (cvt.hatm.gainApplicationSpaceChromaticities[0] - 0.68  ) <  P_GAIN_APPLICATION_SPACE_CHROMATICITY &&
-        (cvt.hatm.gainApplicationSpaceChromaticities[1] - 0.32  ) <  P_GAIN_APPLICATION_SPACE_CHROMATICITY &&
-        (cvt.hatm.gainApplicationSpaceChromaticities[2] - 0.265 ) <  P_GAIN_APPLICATION_SPACE_CHROMATICITY &&
-        (cvt.hatm.gainApplicationSpaceChromaticities[3] - 0.69  ) <  P_GAIN_APPLICATION_SPACE_CHROMATICITY &&
-        (cvt.hatm.gainApplicationSpaceChromaticities[4] - 0.15  ) <  P_GAIN_APPLICATION_SPACE_CHROMATICITY &&
-        (cvt.hatm.gainApplicationSpaceChromaticities[5] - 0.06  ) <  P_GAIN_APPLICATION_SPACE_CHROMATICITY &&
-        (cvt.hatm.gainApplicationSpaceChromaticities[6] - 0.3127) <  P_GAIN_APPLICATION_SPACE_CHROMATICITY &&
-        (cvt.hatm.gainApplicationSpaceChromaticities[7] - 0.329 ) < Q_GAIN_APPLICATION_SPACE_CHROMATICITY ) { 
-        elm.gain_application_space_chromaticities_mode = 1;
-      } else if (
-        (cvt.hatm.gainApplicationSpaceChromaticities[0] - 0.708 ) <  P_GAIN_APPLICATION_SPACE_CHROMATICITY &&
-        (cvt.hatm.gainApplicationSpaceChromaticities[1] - 0.292 ) <  P_GAIN_APPLICATION_SPACE_CHROMATICITY &&
-        (cvt.hatm.gainApplicationSpaceChromaticities[2] - 0.17  ) <  P_GAIN_APPLICATION_SPACE_CHROMATICITY &&
-        (cvt.hatm.gainApplicationSpaceChromaticities[3] - 0.797 ) <  P_GAIN_APPLICATION_SPACE_CHROMATICITY &&
-        (cvt.hatm.gainApplicationSpaceChromaticities[4] - 0.131 ) <  P_GAIN_APPLICATION_SPACE_CHROMATICITY &&
-        (cvt.hatm.gainApplicationSpaceChromaticities[5] - 0.046 ) <  P_GAIN_APPLICATION_SPACE_CHROMATICITY &&
-        (cvt.hatm.gainApplicationSpaceChromaticities[6] - 0.3127) <  P_GAIN_APPLICATION_SPACE_CHROMATICITY &&
-        (cvt.hatm.gainApplicationSpaceChromaticities[7] - 0.329 ) < P_GAIN_APPLICATION_SPACE_CHROMATICITY){ 
-          elm.gain_application_space_chromaticities_mode = 2;
-      } else {
-        elm.gain_application_space_chromaticities_mode = 3;
-        for (uint16_t iCh = 0; iCh < 8; iCh++) {
-          elm.gain_application_space_chromaticities[iCh] = uint16_t(cvt.hatm.gainApplicationSpaceChromaticities[iCh]* Q_GAIN_APPLICATION_SPACE_CHROMATICITY);
-        }
+      // Validate that we have the required data structures
+      if (cvt.hatm.numAlternateImages == 0) {
+          logMsg(LOGLEVEL_ERROR, "numAlternateImages is 0, but reference white tone mapping is disabled. Cannot proceed.");
+          return;
       }
 
-      // Check if all component mixing uses the same parameters 
+      if (cvt.hatm.cgf.size() < cvt.hatm.numAlternateImages) {
+          logMsg(LOGLEVEL_ERROR, "cgf array size (%zu) is less than numAlternateImages (%u). JSON data is incomplete or malformed.", cvt.hatm.cgf.size(), cvt.hatm.numAlternateImages);
+          return;
+      }
+
+      // Check if the primary combination is known
+      if (
+          (cvt.hatm.gainApplicationSpaceChromaticities[0] - 0.64  ) <  P_GAIN_APPLICATION_SPACE_CHROMATICITY &&
+          (cvt.hatm.gainApplicationSpaceChromaticities[1] - 0.33  ) <  P_GAIN_APPLICATION_SPACE_CHROMATICITY &&
+          (cvt.hatm.gainApplicationSpaceChromaticities[2] - 0.30  ) <  P_GAIN_APPLICATION_SPACE_CHROMATICITY &&
+          (cvt.hatm.gainApplicationSpaceChromaticities[3] - 0.60  ) <  P_GAIN_APPLICATION_SPACE_CHROMATICITY &&
+          (cvt.hatm.gainApplicationSpaceChromaticities[4] - 0.15  ) <  P_GAIN_APPLICATION_SPACE_CHROMATICITY &&
+          (cvt.hatm.gainApplicationSpaceChromaticities[5] - 0.06  ) <  P_GAIN_APPLICATION_SPACE_CHROMATICITY &&
+          (cvt.hatm.gainApplicationSpaceChromaticities[6] - 0.3127) <  P_GAIN_APPLICATION_SPACE_CHROMATICITY &&
+          (cvt.hatm.gainApplicationSpaceChromaticities[7] - 0.3290) < P_GAIN_APPLICATION_SPACE_CHROMATICITY){
+              elm.gain_application_space_chromaticities_mode = 0;
+          }
+      else if (
+              (cvt.hatm.gainApplicationSpaceChromaticities[0] - 0.68  ) <  P_GAIN_APPLICATION_SPACE_CHROMATICITY &&
+              (cvt.hatm.gainApplicationSpaceChromaticities[1] - 0.32  ) <  P_GAIN_APPLICATION_SPACE_CHROMATICITY &&
+              (cvt.hatm.gainApplicationSpaceChromaticities[2] - 0.265 ) <  P_GAIN_APPLICATION_SPACE_CHROMATICITY &&
+              (cvt.hatm.gainApplicationSpaceChromaticities[3] - 0.69  ) <  P_GAIN_APPLICATION_SPACE_CHROMATICITY &&
+              (cvt.hatm.gainApplicationSpaceChromaticities[4] - 0.15  ) <  P_GAIN_APPLICATION_SPACE_CHROMATICITY &&
+              (cvt.hatm.gainApplicationSpaceChromaticities[5] - 0.06  ) <  P_GAIN_APPLICATION_SPACE_CHROMATICITY &&
+              (cvt.hatm.gainApplicationSpaceChromaticities[6] - 0.3127) <  P_GAIN_APPLICATION_SPACE_CHROMATICITY &&
+              (cvt.hatm.gainApplicationSpaceChromaticities[7] - 0.329 ) < Q_GAIN_APPLICATION_SPACE_CHROMATICITY ) {
+                  elm.gain_application_space_chromaticities_mode = 1;
+      } else if (
+                (cvt.hatm.gainApplicationSpaceChromaticities[0] - 0.708 ) <  P_GAIN_APPLICATION_SPACE_CHROMATICITY &&
+                (cvt.hatm.gainApplicationSpaceChromaticities[1] - 0.292 ) <  P_GAIN_APPLICATION_SPACE_CHROMATICITY &&
+                (cvt.hatm.gainApplicationSpaceChromaticities[2] - 0.17  ) <  P_GAIN_APPLICATION_SPACE_CHROMATICITY &&
+                (cvt.hatm.gainApplicationSpaceChromaticities[3] - 0.797 ) <  P_GAIN_APPLICATION_SPACE_CHROMATICITY &&
+                (cvt.hatm.gainApplicationSpaceChromaticities[4] - 0.131 ) <  P_GAIN_APPLICATION_SPACE_CHROMATICITY &&
+                (cvt.hatm.gainApplicationSpaceChromaticities[5] - 0.046 ) <  P_GAIN_APPLICATION_SPACE_CHROMATICITY &&
+                (cvt.hatm.gainApplicationSpaceChromaticities[6] - 0.3127) <  P_GAIN_APPLICATION_SPACE_CHROMATICITY &&
+                (cvt.hatm.gainApplicationSpaceChromaticities[7] - 0.329 ) < P_GAIN_APPLICATION_SPACE_CHROMATICITY){
+                    elm.gain_application_space_chromaticities_mode = 2;
+        } else {
+            elm.gain_application_space_chromaticities_mode = 3;
+            for (uint16_t iCh = 0; iCh < 8; iCh++) {
+                elm.gain_application_space_chromaticities[iCh] = uint16_t(cvt.hatm.gainApplicationSpaceChromaticities[iCh]* Q_GAIN_APPLICATION_SPACE_CHROMATICITY);
+            }
+        }
+
+      // Check if all component mixing uses the same parameters
       elm.has_common_component_mix_params_flag = true; // Init at true, any mismatch makes it false
       for (uint16_t iAlt = 1; iAlt < cvt.hatm.numAlternateImages; iAlt++) {
-        // Check if any coefficient is different across alterante images
-        if (abs(cvt.hatm.cgf[0].cm.componentMixRed       - cvt.hatm.cgf[iAlt].cm.componentMixRed)       > Q_COMPONENT_MIXING_COEFFICIENT || 
-            abs(cvt.hatm.cgf[0].cm.componentMixGreen     - cvt.hatm.cgf[iAlt].cm.componentMixGreen)     > Q_COMPONENT_MIXING_COEFFICIENT || 
-            abs(cvt.hatm.cgf[0].cm.componentMixBlue      - cvt.hatm.cgf[iAlt].cm.componentMixBlue)      > Q_COMPONENT_MIXING_COEFFICIENT || 
-            abs(cvt.hatm.cgf[0].cm.componentMixMax       - cvt.hatm.cgf[iAlt].cm.componentMixMax)       > Q_COMPONENT_MIXING_COEFFICIENT || 
-            abs(cvt.hatm.cgf[0].cm.componentMixMin       - cvt.hatm.cgf[iAlt].cm.componentMixMin)       > Q_COMPONENT_MIXING_COEFFICIENT || 
-            abs(cvt.hatm.cgf[0].cm.componentMixComponent - cvt.hatm.cgf[iAlt].cm.componentMixComponent) > Q_COMPONENT_MIXING_COEFFICIENT) {
-          elm.has_common_component_mix_params_flag = false;
-          break;
-        }
-      } 
+          // Check if any coefficient is different across alterante images
+          if (abs(cvt.hatm.cgf[0].cm.componentMixRed       - cvt.hatm.cgf[iAlt].cm.componentMixRed)       > Q_COMPONENT_MIXING_COEFFICIENT ||
+              abs(cvt.hatm.cgf[0].cm.componentMixGreen     - cvt.hatm.cgf[iAlt].cm.componentMixGreen)     > Q_COMPONENT_MIXING_COEFFICIENT ||
+              abs(cvt.hatm.cgf[0].cm.componentMixBlue      - cvt.hatm.cgf[iAlt].cm.componentMixBlue)      > Q_COMPONENT_MIXING_COEFFICIENT ||
+              abs(cvt.hatm.cgf[0].cm.componentMixMax       - cvt.hatm.cgf[iAlt].cm.componentMixMax)       > Q_COMPONENT_MIXING_COEFFICIENT ||
+              abs(cvt.hatm.cgf[0].cm.componentMixMin       - cvt.hatm.cgf[iAlt].cm.componentMixMin)       > Q_COMPONENT_MIXING_COEFFICIENT ||
+              abs(cvt.hatm.cgf[0].cm.componentMixComponent - cvt.hatm.cgf[iAlt].cm.componentMixComponent) > Q_COMPONENT_MIXING_COEFFICIENT) {
+              elm.has_common_component_mix_params_flag = false;
+              break;
+          }
+      }
 
       // Check if all alternate have the same number of control points and interpolation
       elm.has_common_curve_params_flag = true;  // Init at true, any mismatch makes it false
       for (uint16_t iAlt = 1; iAlt < cvt.hatm.numAlternateImages; iAlt++) {
-        if (cvt.hatm.cgf[0].gc.gainCurveNumControlPoints != cvt.hatm.cgf[iAlt].gc.gainCurveNumControlPoints){
-          elm.has_common_component_mix_params_flag = false;
-          break;
-        }
+          if (cvt.hatm.cgf[0].gc.gainCurveNumControlPoints != cvt.hatm.cgf[iAlt].gc.gainCurveNumControlPoints){
+              elm.has_common_component_mix_params_flag = false;
+              break;
+          }
       }
 
       // If they do, then check if all alternate have the same x position
       for (uint16_t pIdx = 0; pIdx < cvt.hatm.cgf[0].gc.gainCurveNumControlPoints; pIdx++){
-        for (uint16_t iAlt = 1; iAlt < cvt.hatm.numAlternateImages; iAlt++) {
-          if (cvt.hatm.cgf[0].gc.gainCurveControlPointX[pIdx] - cvt.hatm.cgf[iAlt].gc.gainCurveControlPointX[pIdx] > Q_GAIN_CURVE_CONTROL_POINT_X){
-            elm.has_common_component_mix_params_flag = false;
-            break;
+          for (uint16_t iAlt = 1; iAlt < cvt.hatm.numAlternateImages; iAlt++) {
+              if (cvt.hatm.cgf[0].gc.gainCurveControlPointX[pIdx] - cvt.hatm.cgf[iAlt].gc.gainCurveControlPointX[pIdx] > Q_GAIN_CURVE_CONTROL_POINT_X){
+                  elm.has_common_component_mix_params_flag = false;
+                  break;
+              }
           }
-        }
-      } 
-      
+      }
+
       // Loop over alternate images
       for (uint16_t iAlt = 0; iAlt < cvt.hatm.numAlternateImages; iAlt++) {
-        elm.alternate_hdr_headrooms[iAlt] = uint16_t(cvt.hatm.alternateHdrHeadroom[iAlt] * Q_HDR_HEADROOM);
+          elm.alternate_hdr_headrooms[iAlt] = uint16_t(cvt.hatm.alternateHdrHeadroom[iAlt] * Q_HDR_HEADROOM);
 
-        // init coefficient to 0
-        for (uint16_t iCmf = 0; iCmf < MAX_NB_component_mixing_coefficient; iCmf++){
-          elm.component_mixing_coefficient[iAlt][iCmf] = uint16_t(0);
-          elm.has_component_mixing_coefficient_flag[iAlt][iCmf] = false;
-        }
-        // Component mixing
-        if (
-          abs(cvt.hatm.cgf[iAlt].cm.componentMixRed      ) < P_COMPONENT_MIXING_COEFFICIENT &&
-          abs(cvt.hatm.cgf[iAlt].cm.componentMixGreen    ) < P_COMPONENT_MIXING_COEFFICIENT &&
-          abs(cvt.hatm.cgf[iAlt].cm.componentMixBlue     ) < P_COMPONENT_MIXING_COEFFICIENT &&
-          abs(cvt.hatm.cgf[iAlt].cm.componentMixMax- 1.0 ) < P_COMPONENT_MIXING_COEFFICIENT &&
-          abs(cvt.hatm.cgf[iAlt].cm.componentMixMin      ) < P_COMPONENT_MIXING_COEFFICIENT &&
-          abs(cvt.hatm.cgf[iAlt].cm.componentMixComponent) < P_COMPONENT_MIXING_COEFFICIENT){ 
-          elm.component_mixing_type[iAlt] = 0;
-        } else if (
-          abs(cvt.hatm.cgf[iAlt].cm.componentMixRed      ) < P_COMPONENT_MIXING_COEFFICIENT &&
-          abs(cvt.hatm.cgf[iAlt].cm.componentMixGreen    ) < P_COMPONENT_MIXING_COEFFICIENT &&
-          abs(cvt.hatm.cgf[iAlt].cm.componentMixBlue     ) < P_COMPONENT_MIXING_COEFFICIENT &&
-          abs(cvt.hatm.cgf[iAlt].cm.componentMixMax      ) < P_COMPONENT_MIXING_COEFFICIENT &&
-          abs(cvt.hatm.cgf[iAlt].cm.componentMixMin      ) < P_COMPONENT_MIXING_COEFFICIENT &&
-          abs(cvt.hatm.cgf[iAlt].cm.componentMixComponent - 1.0 ) < P_COMPONENT_MIXING_COEFFICIENT){ 
-          elm.component_mixing_type[iAlt] = 1;
-        }  else if (
-          abs(cvt.hatm.cgf[iAlt].cm.componentMixRed   - (1.0 / 6.0)) < P_COMPONENT_MIXING_COEFFICIENT &&
-          abs(cvt.hatm.cgf[iAlt].cm.componentMixGreen - (1.0 / 6.0)) < P_COMPONENT_MIXING_COEFFICIENT &&
-          abs(cvt.hatm.cgf[iAlt].cm.componentMixBlue  - (1.0 / 6.0)) < P_COMPONENT_MIXING_COEFFICIENT &&
-          abs(cvt.hatm.cgf[iAlt].cm.componentMixMax   - (1.0 / 2.0)) < P_COMPONENT_MIXING_COEFFICIENT &&
-          abs(cvt.hatm.cgf[iAlt].cm.componentMixMin      ) < P_COMPONENT_MIXING_COEFFICIENT &&
-          abs(cvt.hatm.cgf[iAlt].cm.componentMixComponent) < P_COMPONENT_MIXING_COEFFICIENT){ 
-          elm.component_mixing_type[iAlt] = 2;
-        } else { // Send flag to true for each non-zero coefficient
-          elm.component_mixing_type[iAlt] = 3;
-          uint16_t iCmf = 0;
-          // 
-          elm.component_mixing_coefficient[iAlt][iCmf] = uint16_t(cvt.hatm.cgf[iAlt].cm.componentMixRed       * Q_COMPONENT_MIXING_COEFFICIENT); iCmf++;
-          elm.component_mixing_coefficient[iAlt][iCmf] = uint16_t(cvt.hatm.cgf[iAlt].cm.componentMixGreen     * Q_COMPONENT_MIXING_COEFFICIENT); iCmf++;
-          elm.component_mixing_coefficient[iAlt][iCmf] = uint16_t(cvt.hatm.cgf[iAlt].cm.componentMixBlue      * Q_COMPONENT_MIXING_COEFFICIENT); iCmf++;
-          elm.component_mixing_coefficient[iAlt][iCmf] = uint16_t(cvt.hatm.cgf[iAlt].cm.componentMixMax       * Q_COMPONENT_MIXING_COEFFICIENT); iCmf++;
-          elm.component_mixing_coefficient[iAlt][iCmf] = uint16_t(cvt.hatm.cgf[iAlt].cm.componentMixMin       * Q_COMPONENT_MIXING_COEFFICIENT); iCmf++;
-          elm.component_mixing_coefficient[iAlt][iCmf] = uint16_t(cvt.hatm.cgf[iAlt].cm.componentMixComponent * Q_COMPONENT_MIXING_COEFFICIENT); iCmf++;
-          uint16_t sumCoefficients = 0;
-          for (iCmf = 0; iCmf < MAX_NB_component_mixing_coefficient; iCmf++){
-            if (elm.component_mixing_coefficient[iAlt][iCmf] > 0 && elm.component_mixing_coefficient[iAlt][iCmf] <= 10000){
-              elm.has_component_mixing_coefficient_flag[iAlt][iCmf] = true;
-            } else if (elm.component_mixing_coefficient[iAlt][iCmf] == 0) {
+          // init coefficient to 0
+          for (uint16_t iCmf = 0; iCmf < MAX_NB_component_mixing_coefficient; iCmf++){
+              elm.component_mixing_coefficient[iAlt][iCmf] = uint16_t(0);
               elm.has_component_mixing_coefficient_flag[iAlt][iCmf] = false;
-            } else {
-              logMsg(LOGLEVEL_ERROR, "component mixing coefficient for alternate %d color %d is greater than 1.0", iAlt, iCmf);
-            }
-            sumCoefficients = sumCoefficients + elm.component_mixing_coefficient[iAlt][iCmf];
           }
-          if (sumCoefficients != 60000) { logMsg(LOGLEVEL_ERROR, "sum component mixing coefficient for alternate %d is not equal to 1.0", iAlt); }
-        }
+          // Component mixing
+          if (
+              abs(cvt.hatm.cgf[iAlt].cm.componentMixRed      ) < P_COMPONENT_MIXING_COEFFICIENT &&
+              abs(cvt.hatm.cgf[iAlt].cm.componentMixGreen    ) < P_COMPONENT_MIXING_COEFFICIENT &&
+              abs(cvt.hatm.cgf[iAlt].cm.componentMixBlue     ) < P_COMPONENT_MIXING_COEFFICIENT &&
+              abs(cvt.hatm.cgf[iAlt].cm.componentMixMax- 1.0 ) < P_COMPONENT_MIXING_COEFFICIENT &&
+              abs(cvt.hatm.cgf[iAlt].cm.componentMixMin      ) < P_COMPONENT_MIXING_COEFFICIENT &&
+              abs(cvt.hatm.cgf[iAlt].cm.componentMixComponent) < P_COMPONENT_MIXING_COEFFICIENT){
+                  elm.component_mixing_type[iAlt] = 0;
+              } else if (
+                          abs(cvt.hatm.cgf[iAlt].cm.componentMixRed      ) < P_COMPONENT_MIXING_COEFFICIENT &&
+                          abs(cvt.hatm.cgf[iAlt].cm.componentMixGreen    ) < P_COMPONENT_MIXING_COEFFICIENT &&
+                          abs(cvt.hatm.cgf[iAlt].cm.componentMixBlue     ) < P_COMPONENT_MIXING_COEFFICIENT &&
+                          abs(cvt.hatm.cgf[iAlt].cm.componentMixMax      ) < P_COMPONENT_MIXING_COEFFICIENT &&
+                          abs(cvt.hatm.cgf[iAlt].cm.componentMixMin      ) < P_COMPONENT_MIXING_COEFFICIENT &&
+                          abs(cvt.hatm.cgf[iAlt].cm.componentMixComponent - 1.0 ) < P_COMPONENT_MIXING_COEFFICIENT){
+                              elm.component_mixing_type[iAlt] = 1;
+                          }  else if (
+                                      abs(cvt.hatm.cgf[iAlt].cm.componentMixRed   - (1.0 / 6.0)) < P_COMPONENT_MIXING_COEFFICIENT &&
+                                      abs(cvt.hatm.cgf[iAlt].cm.componentMixGreen - (1.0 / 6.0)) < P_COMPONENT_MIXING_COEFFICIENT &&
+                                      abs(cvt.hatm.cgf[iAlt].cm.componentMixBlue  - (1.0 / 6.0)) < P_COMPONENT_MIXING_COEFFICIENT &&
+                                      abs(cvt.hatm.cgf[iAlt].cm.componentMixMax   - (1.0 / 2.0)) < P_COMPONENT_MIXING_COEFFICIENT &&
+                                      abs(cvt.hatm.cgf[iAlt].cm.componentMixMin      ) < P_COMPONENT_MIXING_COEFFICIENT &&
+                                      abs(cvt.hatm.cgf[iAlt].cm.componentMixComponent) < P_COMPONENT_MIXING_COEFFICIENT){
+                                          elm.component_mixing_type[iAlt] = 2;
+                                      } else { // Send flag to true for each non-zero coefficient
+                                          elm.component_mixing_type[iAlt] = 3;
+                                          uint16_t iCmf = 0;
+                                          //
+                                          elm.component_mixing_coefficient[iAlt][iCmf] = uint16_t(cvt.hatm.cgf[iAlt].cm.componentMixRed       * Q_COMPONENT_MIXING_COEFFICIENT); iCmf++;
+                                          elm.component_mixing_coefficient[iAlt][iCmf] = uint16_t(cvt.hatm.cgf[iAlt].cm.componentMixGreen     * Q_COMPONENT_MIXING_COEFFICIENT); iCmf++;
+                                          elm.component_mixing_coefficient[iAlt][iCmf] = uint16_t(cvt.hatm.cgf[iAlt].cm.componentMixBlue      * Q_COMPONENT_MIXING_COEFFICIENT); iCmf++;
+                                          elm.component_mixing_coefficient[iAlt][iCmf] = uint16_t(cvt.hatm.cgf[iAlt].cm.componentMixMax       * Q_COMPONENT_MIXING_COEFFICIENT); iCmf++;
+                                          elm.component_mixing_coefficient[iAlt][iCmf] = uint16_t(cvt.hatm.cgf[iAlt].cm.componentMixMin       * Q_COMPONENT_MIXING_COEFFICIENT); iCmf++;
+                                          elm.component_mixing_coefficient[iAlt][iCmf] = uint16_t(cvt.hatm.cgf[iAlt].cm.componentMixComponent * Q_COMPONENT_MIXING_COEFFICIENT); iCmf++;
+                                          uint16_t sumCoefficients = 0;
+                                          for (iCmf = 0; iCmf < MAX_NB_component_mixing_coefficient; iCmf++){
+                                              if (elm.component_mixing_coefficient[iAlt][iCmf] > 0 && elm.component_mixing_coefficient[iAlt][iCmf] <= 10000){
+                                                  elm.has_component_mixing_coefficient_flag[iAlt][iCmf] = true;
+                                              } else if (elm.component_mixing_coefficient[iAlt][iCmf] == 0) {
+                                                  elm.has_component_mixing_coefficient_flag[iAlt][iCmf] = false;
+                                              } else {
+                                                  logMsg(LOGLEVEL_ERROR, "component mixing coefficient for alternate %d color %d is greater than 1.0", iAlt, iCmf);
+                                              }
+                                              sumCoefficients = sumCoefficients + elm.component_mixing_coefficient[iAlt][iCmf];
+                                          }
+                                          if (sumCoefficients != 60000) { logMsg(LOGLEVEL_ERROR, "sum component mixing coefficient for alternate %d is not equal to 1.0", iAlt); }
+                                      }
 
-        // Create syntax elements for the gain curve function
-        elm.gain_curve_num_control_points_minus_1[iAlt] = cvt.hatm.cgf[iAlt].gc.gainCurveNumControlPoints - 1;
-        for (uint16_t iCps = 0; iCps < cvt.hatm.cgf[iAlt].gc.gainCurveNumControlPoints; iCps++){
-          elm.gain_curve_control_points_x[iAlt][iCps] = uint16_t(cvt.hatm.cgf[iAlt].gc.gainCurveControlPointX[iCps] * Q_GAIN_CURVE_CONTROL_POINT_X );
-          elm.gain_curve_control_points_y[iAlt][iCps] = uint16_t( abs( cvt.hatm.cgf[iAlt].gc.gainCurveControlPointY[iCps] ) * Q_GAIN_CURVE_CONTROL_POINT_Y );
-        }
-        elm.gain_curve_use_pchip_slope_flag[iAlt] = !hasSlopeParameter[iAlt];
-        if (!elm.gain_curve_use_pchip_slope_flag[iAlt]) {
-          for (uint16_t iCps = 0; iCps < cvt.hatm.cgf[iAlt].gc.gainCurveNumControlPoints; iCps++) {
-            elm.gain_curve_control_points_theta[iAlt][iCps] = uint16_t((cvt.hatm.cgf[iAlt].gc.gainCurveControlPointTheta[iCps] + O_GAIN_CURVE_CONTROL_POINT_THETA) * Q_GAIN_CURVE_CONTROL_POINT_THETA );
+          // Create syntax elements for the gain curve function
+          elm.gain_curve_num_control_points_minus_1[iAlt] = cvt.hatm.cgf[iAlt].gc.gainCurveNumControlPoints - 1;
+          for (uint16_t iCps = 0; iCps < cvt.hatm.cgf[iAlt].gc.gainCurveNumControlPoints; iCps++){
+              elm.gain_curve_control_points_x[iAlt][iCps] = uint16_t(cvt.hatm.cgf[iAlt].gc.gainCurveControlPointX[iCps] * Q_GAIN_CURVE_CONTROL_POINT_X );
+              elm.gain_curve_control_points_y[iAlt][iCps] = uint16_t( abs( cvt.hatm.cgf[iAlt].gc.gainCurveControlPointY[iCps] ) * Q_GAIN_CURVE_CONTROL_POINT_Y );
           }
-        }
+          elm.gain_curve_use_pchip_slope_flag[iAlt] = !hasSlopeParameter[iAlt];
+          if (!elm.gain_curve_use_pchip_slope_flag[iAlt]) {
+              for (uint16_t iCps = 0; iCps < cvt.hatm.cgf[iAlt].gc.gainCurveNumControlPoints; iCps++) {
+                  elm.gain_curve_control_points_theta[iAlt][iCps] = uint16_t((cvt.hatm.cgf[iAlt].gc.gainCurveControlPointTheta[iCps] + O_GAIN_CURVE_CONTROL_POINT_THETA) * Q_GAIN_CURVE_CONTROL_POINT_THETA );
+              }
+          }
       }
     }
+  }
   }
 
 // Convert syntax element to finary data and write to file
