@@ -128,7 +128,7 @@ static MP4Err findIt35MetadataTrack(MP4Movie moov,
 }
 
 bool DedicatedIt35Extractor::canExtract(const ExtractionConfig& config,
-                                         std::string& reason) const {
+                                         std::string& reason) {
     if (!config.movie) {
         reason = "No movie provided";
         return false;

@@ -23,6 +23,20 @@ static std::string fourCCToString(u32 fourcc) {
     return std::string(buf);
 }
 
+// MebxMe4cExtractor implementation
+
+MebxMe4cExtractor::~MebxMe4cExtractor() {
+    clearCache();
+}
+
+void MebxMe4cExtractor::clearCache() {
+    if (m_cachedReader) {
+        MP4DisposeTrackReader(m_cachedReader);
+        m_cachedReader = nullptr;
+    }
+    m_cachedTrack = nullptr;
+}
+
 // Helper: Find mebx track with me4c namespace and it35 key_value
 static MP4Err findMebxMe4cTrackReader(MP4Movie moov,
                                        const std::string& t35PrefixStr,
@@ -255,100 +269,25 @@ static MP4Err findMebxMe4cTrackReader(MP4Movie moov,
 }
 
 bool MebxMe4cExtractor::canExtract(const ExtractionConfig& config,
-                                    std::string& reason) const {
+                                    std::string& reason) {
     if (!config.movie) {
         reason = "No movie provided";
         return false;
     }
 
-    MP4Err err = MP4NoErr;
-    u32 trackCount = 0;
-    err = MP4GetMovieTrackCount(config.movie, &trackCount);
+    // Clear any previous cache
+    clearCache();
+
+    // Find and cache the reader with setupInfo verification
+    MP4Err err = findMebxMe4cTrackReader(config.movie, config.t35Prefix,
+                                          &m_cachedReader, &m_cachedTrack);
+
     if (err) {
-        reason = "Failed to get track count";
+        reason = "No mebx track with me4c namespace and matching T.35 prefix found";
         return false;
     }
 
-    // Quick check: does this file have ANY mebx track with me4c namespace and it35 key?
-    // We don't verify setupInfo here - that's done in extract()
-    for (u32 i = 1; i <= trackCount; ++i) {
-        MP4Track trak = nullptr;
-        MP4Media media = nullptr;
-        u32 handlerType = 0;
-
-        err = MP4GetMovieIndTrack(config.movie, i, &trak);
-        if (err) continue;
-
-        err = MP4GetTrackMedia(trak, &media);
-        if (err) continue;
-
-        err = MP4GetMediaHandlerDescription(media, &handlerType, nullptr);
-        if (err) continue;
-
-        // Only metadata tracks
-        if (handlerType != MP4MetaHandlerType) continue;
-
-        // Create track reader to check sample description
-        MP4TrackReader reader = nullptr;
-        err = MP4CreateTrackReader(trak, &reader);
-        if (err) continue;
-
-        MP4Handle sampleEntryH = nullptr;
-        err = MP4NewHandle(0, &sampleEntryH);
-        if (err) {
-            MP4DisposeTrackReader(reader);
-            continue;
-        }
-
-        err = MP4TrackReaderGetCurrentSampleDescription(reader, sampleEntryH);
-        if (err) {
-            MP4DisposeHandle(sampleEntryH);
-            MP4DisposeTrackReader(reader);
-            continue;
-        }
-
-        // Check if it's 'mebx'
-        u32 type = 0;
-        err = ISOGetSampleDescriptionType(sampleEntryH, &type);
-        if (err || type != MP4BoxedMetadataSampleEntryType) {
-            MP4DisposeHandle(sampleEntryH);
-            MP4DisposeTrackReader(reader);
-            continue;
-        }
-
-        // Try to find ANY me4c/it35 entry (don't verify setupInfo)
-        u32 key_namespace = MP4_FOUR_CHAR_CODE('m', 'e', '4', 'c');
-        MP4Handle key_value = nullptr;
-        err = MP4NewHandle(4, &key_value);
-        if (err) {
-            MP4DisposeHandle(sampleEntryH);
-            MP4DisposeTrackReader(reader);
-            continue;
-        }
-
-        // Key_value = 'it35' (4CC)
-        u32 it35_fourcc = MP4_FOUR_CHAR_CODE('i', 't', '3', '5');
-        char* keyPtr = (char*)*key_value;
-        keyPtr[0] = (it35_fourcc >> 24) & 0xFF;
-        keyPtr[1] = (it35_fourcc >> 16) & 0xFF;
-        keyPtr[2] = (it35_fourcc >> 8) & 0xFF;
-        keyPtr[3] = it35_fourcc & 0xFF;
-
-        u32 local_key_id = 0;
-        err = MP4SelectFirstMebxTrackReaderKey(reader, key_namespace, key_value, &local_key_id);
-
-        MP4DisposeHandle(key_value);
-        MP4DisposeHandle(sampleEntryH);
-        MP4DisposeTrackReader(reader);
-
-        if (err == MP4NoErr) {
-            // Found at least one me4c/it35 entry - that's enough for canExtract
-            return true;
-        }
-    }
-
-    reason = "No mebx track with me4c namespace and it35 key found";
-    return false;
+    return true;
 }
 
 MP4Err MebxMe4cExtractor::extract(const ExtractionConfig& config) {
@@ -360,12 +299,23 @@ MP4Err MebxMe4cExtractor::extract(const ExtractionConfig& config) {
     MP4TrackReader mebxReader = nullptr;
     MP4Track mebxTrack = nullptr;
 
-    // Find mebx me4c track
-    LOG_DEBUG("Finding mebx me4c track");
-    err = findMebxMe4cTrackReader(config.movie, config.t35Prefix, &mebxReader, &mebxTrack);
-    if (err) {
-        LOG_ERROR("Failed to find mebx me4c track (err={})", err);
-        return err;
+    // Use cached reader if available (from canExtract), otherwise find it now
+    if (m_cachedReader) {
+        LOG_DEBUG("Using cached mebx me4c track reader");
+        mebxReader = m_cachedReader;
+        mebxTrack = m_cachedTrack;
+
+        // Clear cache so we don't double-dispose
+        m_cachedReader = nullptr;
+        m_cachedTrack = nullptr;
+    } else {
+        // Fallback: extract() called without canExtract()
+        LOG_DEBUG("Finding mebx me4c track (cache not available)");
+        err = findMebxMe4cTrackReader(config.movie, config.t35Prefix, &mebxReader, &mebxTrack);
+        if (err) {
+            LOG_ERROR("Failed to find mebx me4c track (err={})", err);
+            return err;
+        }
     }
 
     // Get timescale

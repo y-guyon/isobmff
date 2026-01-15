@@ -136,7 +136,7 @@ static MP4Err findMebxTrackReader(MP4Movie moov,
 }
 
 bool MebxIt35Extractor::canExtract(const ExtractionConfig& config,
-                                   std::string& reason) const {
+                                   std::string& reason) {
     if (!config.movie) {
         reason = "No movie provided";
         return false;

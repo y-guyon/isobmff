@@ -20,7 +20,7 @@ public:
     }
 
     bool canExtract(const ExtractionConfig& config,
-                   std::string& reason) const override;
+                   std::string& reason) override;
 
     MP4Err extract(const ExtractionConfig& config) override;
 };

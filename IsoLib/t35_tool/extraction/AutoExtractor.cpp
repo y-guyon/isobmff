@@ -7,7 +7,7 @@
 namespace t35 {
 
 bool AutoExtractor::canExtract(const ExtractionConfig& config,
-                               std::string& reason) const {
+                               std::string& reason) {
     // Try extractors in priority order
     std::vector<std::unique_ptr<ExtractionStrategy>> extractors;
     extractors.push_back(std::make_unique<DedicatedIt35Extractor>());

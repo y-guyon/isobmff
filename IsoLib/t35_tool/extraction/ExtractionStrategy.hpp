@@ -52,7 +52,7 @@ public:
      * @return true if strategy can extract
      */
     virtual bool canExtract(const ExtractionConfig& config,
-                           std::string& reason) const = 0;
+                           std::string& reason) = 0;
 
     /**
      * Extract metadata from movie
