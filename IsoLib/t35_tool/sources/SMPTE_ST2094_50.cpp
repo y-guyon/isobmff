@@ -8,11 +8,6 @@ std::string uint8_to_hex(uint8_t value) {
   return ss.str();
 }
 
-// Debug print-out for specific milestone in code
-void dbgPrintMilestones(uint16_t line, const std::string& msg, float value){
-  std::cout <<  "[RB: " << line << " " << msg << "=" << value << "]\n";
-}
-
 // Formatted cout of a name and a value aligned for binary encoding and decoding debugging
 void printDebug(const std::string& varName, uint16_t varValue, uint8_t nbBits) {
   std::cout.width(50); std::cout << varName << "=";
@@ -55,15 +50,13 @@ void push_boolean(struct BinaryData *payloadBinaryData, bool boolValue, const st
     uint8_t decValue = static_cast<uint8_t>(boolValue) ;
     payloadBinaryData->payload[payloadBinaryData->byteIdx] = payloadBinaryData->payload[payloadBinaryData->byteIdx] + (decValue << (7 - payloadBinaryData->bitIdx));
     printDebug(varName, decValue,  1);
-    //printDebug("Bool--" + varName, (decValue << (7 - payloadBinaryData->bitIdx)),  8);
 
     payloadBinaryData->bitIdx++;
     if (payloadBinaryData->bitIdx == uint8_t(8)){
         payloadBinaryData->bitIdx = 0;
         payloadBinaryData->payload.push_back(0); payloadBinaryData->byteIdx++;
     } else if (payloadBinaryData->bitIdx > 8) {
-        // Error to handle
-        dbgPrintMilestones(1, "************************************ Error To Check *************************************************************************************", decValue);
+        std::cerr << "ERROR: push_boolean exceeded a byte for " << varName << "\n";
     }
 }
 
@@ -77,16 +70,14 @@ void push_bits(struct BinaryData *payloadBinaryData, uint8_t value, uint8_t nbBi
         payloadBinaryData->bitIdx = 0;
         payloadBinaryData->payload.push_back(0);
     } else if ( payloadBinaryData->bitIdx == 8) {
-        // Error to handle
-        dbgPrintMilestones(1, "************************************ Error To Check *************************************************************************************", value);
-        dbgPrintMilestones(nbBits, varName, value);
+        std::cerr << "ERROR: push_bits exceeded a byte for " << varName << " while trying to add " << nbBits << " bits\n";
     }
 }
 
 void push_8bits(struct BinaryData *payloadBinaryData, uint16_t value, const std::string& varName){
     // Verify that we are at the start of a byte
     if (payloadBinaryData->bitIdx != 0){
-        dbgPrintMilestones(89, "************************************ Error To Check *************************************************************************************", value);
+        std::cerr << "ERROR: push_8bits called but we are not at the start of a byte \n";
     } else {
         payloadBinaryData->payload[payloadBinaryData->byteIdx] = uint8_t(value & 0x00FF);
         payloadBinaryData->payload.push_back(0); payloadBinaryData->byteIdx++; 
@@ -97,7 +88,7 @@ void push_8bits(struct BinaryData *payloadBinaryData, uint16_t value, const std:
 void push_16bits(struct BinaryData *payloadBinaryData, uint16_t value, const std::string& varName){
     // Verify that we are at the start of a byte
     if (payloadBinaryData->bitIdx != 0){
-        dbgPrintMilestones(89, "************************************ Error To Check *************************************************************************************", value);
+        std::cerr << "ERROR: push_16bits called but we are not at the start of a byte \n";
     } else {
         payloadBinaryData->payload[payloadBinaryData->byteIdx] = uint8_t((value >> 8) & 0x00FF);
         payloadBinaryData->payload.push_back(0); payloadBinaryData->byteIdx++; 
@@ -115,8 +106,7 @@ bool pull_boolean(struct BinaryData *payloadBinaryData, const std::string& varNa
         payloadBinaryData->byteIdx++;
         payloadBinaryData->bitIdx = 0;
     } else if (payloadBinaryData->bitIdx > 8) {
-        // Error to handle
-        dbgPrintMilestones(1, "************************************ Error To Check *************************************************************************************", decValue);
+        std::cerr << "ERROR: pull_boolean exceeded a byte for " << varName << "\n";
     }
     printDebug(varName, decValue,  1);
     return result;
@@ -129,9 +119,7 @@ uint16_t pull_bits(struct BinaryData *payloadBinaryData, uint8_t nbBits, const s
         payloadBinaryData->byteIdx++;
         payloadBinaryData->bitIdx = 0;
     } else if ( payloadBinaryData->bitIdx == 8) {
-        // Error to handle
-        dbgPrintMilestones(1, "************************************ Error To Check *************************************************************************************", decValue);
-        dbgPrintMilestones(nbBits, varName, decValue);
+        std::cerr << "ERROR: push_bits exceeded a byte for " << varName << " while trying to add " << nbBits << " bits\n";
     }
     printDebug(varName, decValue,  nbBits);
     return uint16_t(decValue);
@@ -141,7 +129,7 @@ uint16_t pull_8bits(struct BinaryData *payloadBinaryData, const std::string& var
     // Verify that we are at the start of a byte
     uint16_t decValue = 404;
     if (payloadBinaryData->bitIdx != 0){
-        dbgPrintMilestones(89, "************************************ Error To Check *************************************************************************************", 0);
+        std::cerr << "ERROR: push_8bits called but we are not at the start of a byte \n";
     } else {
         decValue = uint16_t(payloadBinaryData->payload[payloadBinaryData->byteIdx]);
     }
@@ -154,7 +142,7 @@ uint16_t pull_16bits(struct BinaryData *payloadBinaryData, const std::string& va
     // Verify that we are at the start of a byte
     uint16_t decValue = 404;
     if (payloadBinaryData->bitIdx != 0){
-        dbgPrintMilestones(89, "************************************ Error To Check *************************************************************************************", 0);
+        std::cerr << "ERROR: push_16bits called but we are not at the start of a byte \n";
     } else {
         decValue = uint16_t(payloadBinaryData->payload[payloadBinaryData->byteIdx]) << 8; payloadBinaryData->byteIdx++;
         decValue = decValue + uint16_t(payloadBinaryData->payload[payloadBinaryData->byteIdx]); payloadBinaryData->byteIdx++;
@@ -181,7 +169,6 @@ SMPTE_ST2094_50::SMPTE_ST2094_50(){
     isHeadroomAdaptiveToneMap = false;
     isReferenceWhiteToneMapping = false;
     for (uint16_t iAlt = 0; iAlt < MAX_NB_ALTERNATE; iAlt++) {
-        isLinearInterpolation[iAlt] = false;
         hasSlopeParameter[iAlt] = false;
     }
 }
@@ -445,7 +432,7 @@ void SMPTE_ST2094_50::convertMetadataItemsToSyntaxElements(){
           abs(cvt.hatm.cgf[iAlt].cm.componentMixMax- 1.0 ) < P_COMPONENT_MIXING_COEFFICIENT &&
           abs(cvt.hatm.cgf[iAlt].cm.componentMixMin      ) < P_COMPONENT_MIXING_COEFFICIENT &&
           abs(cvt.hatm.cgf[iAlt].cm.componentMixComponent) < P_COMPONENT_MIXING_COEFFICIENT){ 
-          elm.component_mixing_type[iAlt] = 0; dbgPrintMilestones(426, "MaxRGB", cvt.hatm.cgf[iAlt].cm.componentMixMax);
+          elm.component_mixing_type[iAlt] = 0;
         } else if (
           abs(cvt.hatm.cgf[iAlt].cm.componentMixRed      ) < P_COMPONENT_MIXING_COEFFICIENT &&
           abs(cvt.hatm.cgf[iAlt].cm.componentMixGreen    ) < P_COMPONENT_MIXING_COEFFICIENT &&
@@ -453,7 +440,7 @@ void SMPTE_ST2094_50::convertMetadataItemsToSyntaxElements(){
           abs(cvt.hatm.cgf[iAlt].cm.componentMixMax      ) < P_COMPONENT_MIXING_COEFFICIENT &&
           abs(cvt.hatm.cgf[iAlt].cm.componentMixMin      ) < P_COMPONENT_MIXING_COEFFICIENT &&
           abs(cvt.hatm.cgf[iAlt].cm.componentMixComponent - 1.0 ) < P_COMPONENT_MIXING_COEFFICIENT){ 
-          elm.component_mixing_type[iAlt] = 1; dbgPrintMilestones(434, "Cmp", cvt.hatm.cgf[iAlt].cm.componentMixComponent);
+          elm.component_mixing_type[iAlt] = 1;
         }  else if (
           abs(cvt.hatm.cgf[iAlt].cm.componentMixRed   - (1.0 / 6.0)) < P_COMPONENT_MIXING_COEFFICIENT &&
           abs(cvt.hatm.cgf[iAlt].cm.componentMixGreen - (1.0 / 6.0)) < P_COMPONENT_MIXING_COEFFICIENT &&
@@ -461,9 +448,9 @@ void SMPTE_ST2094_50::convertMetadataItemsToSyntaxElements(){
           abs(cvt.hatm.cgf[iAlt].cm.componentMixMax   - (1.0 / 2.0)) < P_COMPONENT_MIXING_COEFFICIENT &&
           abs(cvt.hatm.cgf[iAlt].cm.componentMixMin      ) < P_COMPONENT_MIXING_COEFFICIENT &&
           abs(cvt.hatm.cgf[iAlt].cm.componentMixComponent) < P_COMPONENT_MIXING_COEFFICIENT){ 
-          elm.component_mixing_type[iAlt] = 2; dbgPrintMilestones(442, "LumaA", cvt.hatm.cgf[iAlt].cm.componentMixRed);
+          elm.component_mixing_type[iAlt] = 2;
         } else { // Send flag to true for each non-zero coefficient
-          elm.component_mixing_type[iAlt] = 3; dbgPrintMilestones(444, "Custom", cvt.hatm.cgf[iAlt].cm.componentMixMax);
+          elm.component_mixing_type[iAlt] = 3;
           uint16_t iCmf = 0;
           // 
           elm.component_mixing_coefficient[iAlt][iCmf] = uint16_t(cvt.hatm.cgf[iAlt].cm.componentMixRed       * Q_COMPONENT_MIXING_COEFFICIENT); iCmf++;
@@ -487,11 +474,10 @@ void SMPTE_ST2094_50::convertMetadataItemsToSyntaxElements(){
         }
 
         // Create syntax elements for the gain curve function
-        // elm.gain_curve_interpolation[iAlt] = cvt.hatm.cgf[iAlt].gc.gainCurveInterpolation;
         elm.gain_curve_num_control_points_minus_1[iAlt] = cvt.hatm.cgf[iAlt].gc.gainCurveNumControlPoints - 1;
         for (uint16_t iCps = 0; iCps < cvt.hatm.cgf[iAlt].gc.gainCurveNumControlPoints; iCps++){
           elm.gain_curve_control_points_x[iAlt][iCps] = uint16_t(cvt.hatm.cgf[iAlt].gc.gainCurveControlPointX[iCps] * Q_GAIN_CURVE_CONTROL_POINT_X );
-          elm.gain_curve_control_points_y[iAlt][iCps] = uint16_t((cvt.hatm.cgf[iAlt].gc.gainCurveControlPointY[iCps]  + O_GAIN_CURVE_CONTROL_POINT_Y ) * Q_GAIN_CURVE_CONTROL_POINT_Y );
+          elm.gain_curve_control_points_y[iAlt][iCps] = uint16_t( abs( cvt.hatm.cgf[iAlt].gc.gainCurveControlPointY[iCps] ) * Q_GAIN_CURVE_CONTROL_POINT_Y );
         }
         elm.gain_curve_use_pchip_slope_flag[iAlt] = !hasSlopeParameter[iAlt];
         if (!elm.gain_curve_use_pchip_slope_flag[iAlt]) {
@@ -512,7 +498,9 @@ payloadBinaryData.bitIdx  = 0;
 payloadBinaryData.payload.push_back(0);
 
 std::cout << "++++++++++++++++++++++ start SMPTE_ST2094_50:: writeSyntaxElementsToBinaryData ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\n";  
-push_8bits(&payloadBinaryData, elm.application_version, "application_version");
+push_bits(&payloadBinaryData, elm.application_version, 3, "application_version");
+push_bits(&payloadBinaryData, elm.minimum_application_version, 3, "minimum_application_version");
+push_bits(&payloadBinaryData, 0, 2, "zero_2");
 
 push_boolean(&payloadBinaryData, elm.has_custom_hdr_reference_white_flag, "has_custom_hdr_reference_white_flag");
 push_boolean(&payloadBinaryData, elm.has_adaptive_tone_map_flag, "has_adaptive_tone_map_flag");
@@ -604,7 +592,9 @@ void SMPTE_ST2094_50::decodeBinaryToSyntaxElements(std::vector<uint8_t> binary_d
   }
 
   std::cout << "++++++++++++++++++++++Syntax Elements Decoding ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\n"; 
-  elm.application_version = pull_8bits(&payloadBinaryData, "application_version");
+  elm.application_version = pull_bits(&payloadBinaryData, 3, "application_version");
+  elm.minimum_application_version = pull_bits(&payloadBinaryData, 3, "minimum_application_version");
+  pull_bits(&payloadBinaryData, 2, "zero_2bits");
 
   elm.has_custom_hdr_reference_white_flag = pull_boolean(&payloadBinaryData, "has_custom_hdr_reference_white_flag");
   elm.has_adaptive_tone_map_flag = pull_boolean(&payloadBinaryData, "has_adaptive_tone_map_flag");
@@ -730,7 +720,6 @@ void SMPTE_ST2094_50::convertSyntaxElementsToMetadataItems(){
       float x_knee = 1;
       float x_max  = pow(2.0, cvt.hatm.baselineHdrHeadroom);
       for (uint16_t iAlt = 0;  iAlt  < cvt.hatm.numAlternateImages; iAlt++){
-        isLinearInterpolation[iAlt] = false;
         hasSlopeParameter[iAlt]     = true;
         // Component mixing is maxRGB
         ColorGainFunction cgf;
@@ -815,7 +804,6 @@ void SMPTE_ST2094_50::convertSyntaxElementsToMetadataItems(){
         std::cerr << "gain_application_space_primaries=" << elm.gain_application_space_chromaticities_mode << "  not defined.\n";
       }
       for (uint16_t iAlt = 0;  iAlt  < cvt.hatm.numAlternateImages; iAlt++){
-        isLinearInterpolation[iAlt] = false;
         cvt.hatm.alternateHdrHeadroom.push_back(float(elm.alternate_hdr_headrooms[iAlt]) / Q_HDR_HEADROOM);
         // init k_params to zero and replace the one that are not
         ColorGainFunction cgf;
@@ -845,9 +833,15 @@ void SMPTE_ST2094_50::convertSyntaxElementsToMetadataItems(){
           std::cerr << "mix_encoding[" << iAlt << "]=" << elm.component_mixing_type[iAlt] << "  not defined.\n";
         }
         cgf.gc.gainCurveNumControlPoints = elm.gain_curve_num_control_points_minus_1[iAlt] + 1;
+        // Determine the sign of the gain coefficients based on headrooms difference
+        float sign = 1.0;
+        if (cvt.hatm.baselineHdrHeadroom > cvt.hatm.alternateHdrHeadroom[iAlt])
+        {
+            sign = -1.0;
+        }
         for (uint16_t iCps = 0; iCps < cgf.gc.gainCurveNumControlPoints; iCps++) {
           cgf.gc.gainCurveControlPointX.push_back(float(elm.gain_curve_control_points_x[iAlt][iCps]) / Q_GAIN_CURVE_CONTROL_POINT_X);
-          cgf.gc.gainCurveControlPointY.push_back(float(elm.gain_curve_control_points_y[iAlt][iCps]) / Q_GAIN_CURVE_CONTROL_POINT_Y - O_GAIN_CURVE_CONTROL_POINT_Y);
+          cgf.gc.gainCurveControlPointY.push_back(sign * float(elm.gain_curve_control_points_y[iAlt][iCps]) / Q_GAIN_CURVE_CONTROL_POINT_Y);
           if (!elm.gain_curve_use_pchip_slope_flag[iAlt]) {
             hasSlopeParameter[iAlt]     = true;
             cgf.gc.gainCurveControlPointTheta.push_back(float(elm.gain_curve_control_points_theta[iAlt][iCps]) / Q_GAIN_CURVE_CONTROL_POINT_THETA - O_GAIN_CURVE_CONTROL_POINT_THETA);

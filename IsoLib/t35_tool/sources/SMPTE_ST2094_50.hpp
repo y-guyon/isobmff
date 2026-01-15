@@ -22,10 +22,9 @@ const float P_GAIN_APPLICATION_SPACE_CHROMATICITY = 3.0 / 30000.0 / 2.0;
 const float Q_GAIN_APPLICATION_SPACE_CHROMATICITY = 30000.0 / 3.0; 
 const float P_COMPONENT_MIXING_COEFFICIENT = 1.0 / 10000.0 / 2.0;
 const float Q_COMPONENT_MIXING_COEFFICIENT = 10000.0; 
-const float Q_GAIN_CURVE_CONTROL_POINT_X = 64000.0 / 64.0; 
-const float O_GAIN_CURVE_CONTROL_POINT_Y = 6.0; 
-const float Q_GAIN_CURVE_CONTROL_POINT_Y = 48000.0 / 12.0; 
-const float O_GAIN_CURVE_CONTROL_POINT_THETA = 90.0; 
+const float Q_GAIN_CURVE_CONTROL_POINT_X = 64000.0 / 64.0;
+const float Q_GAIN_CURVE_CONTROL_POINT_Y = 60000.0 / 6.0;
+const float O_GAIN_CURVE_CONTROL_POINT_THETA = 90.0;
 const float Q_GAIN_CURVE_CONTROL_POINT_THETA = 36000.0 / 180.0; 
 
 
@@ -85,8 +84,9 @@ struct TimeInterval{
 // Structure with the syntax elements
 struct SyntaxElements {
     // smpte_st_2094_50_application_info
-    uint16_t application_version;     
-     
+    uint16_t application_version;
+    uint16_t minimum_application_version;
+
     // smpte_st_2094_50_color_volume_transform
     bool has_custom_hdr_reference_white_flag;   
     bool has_adaptive_tone_map_flag;                                               
@@ -151,7 +151,6 @@ private:
     // not in specification, convenience flag for implementation
     bool isHeadroomAdaptiveToneMap;   
     bool isReferenceWhiteToneMapping;
-    bool isLinearInterpolation[MAX_NB_ALTERNATE];
     bool hasSlopeParameter[MAX_NB_ALTERNATE];
 
     SyntaxElements elm;
