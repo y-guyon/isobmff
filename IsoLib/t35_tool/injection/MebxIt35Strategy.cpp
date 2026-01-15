@@ -434,7 +434,7 @@ MP4Err MebxIt35Strategy::inject(const InjectionConfig& config,
         return err;
     }
 
-    LOG_INFO("✓ Metadata injection complete");
+    LOG_INFO("Metadata injection complete");
     return MP4NoErr;
 }
 

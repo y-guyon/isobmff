@@ -1,6 +1,7 @@
 #include "InjectionStrategy.hpp"
 #include "MebxIt35Strategy.hpp"
 #include "MebxMe4cStrategy.hpp"
+#include "DedicatedIt35Strategy.hpp"
 #include "../common/Logger.hpp"
 
 namespace t35 {
@@ -12,8 +13,9 @@ std::unique_ptr<InjectionStrategy> createInjectionStrategy(const std::string& st
         return std::make_unique<MebxIt35Strategy>();
     } else if (strategyName == "mebx-me4c") {
         return std::make_unique<MebxMe4cStrategy>();
-    } else if (strategyName == "dedicated-it35" ||
-               strategyName == "sample-group" ||
+    } else if (strategyName == "dedicated-it35") {
+        return std::make_unique<DedicatedIt35Strategy>();
+    } else if (strategyName == "sample-group" ||
                strategyName == "sample-entry-box" ||
                strategyName == "default-sample-group") {
         throw T35Exception(T35Error::NotImplemented,

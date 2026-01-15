@@ -300,7 +300,7 @@ MP4Err MebxIt35Extractor::extract(const ExtractionConfig& config) {
         }
     }
 
-    LOG_INFO("✓ Extraction complete");
+    LOG_INFO("Extraction complete");
     return MP4NoErr;
 }
 

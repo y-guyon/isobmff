@@ -1,0 +1,264 @@
+#include "DedicatedIt35Extractor.hpp"
+#include "../common/Logger.hpp"
+
+extern "C" {
+    #include "MP4Movies.h"
+    #include "MP4Atoms.h"
+}
+
+#include <filesystem>
+#include <fstream>
+#include <nlohmann/json.hpp>
+
+namespace t35 {
+
+// Helper: Find dedicated IT35 metadata track with matching T.35 prefix
+static MP4Err findIt35MetadataTrack(MP4Movie moov,
+                                     const std::string& t35PrefixStr,
+                                     MP4Track* outTrack) {
+    MP4Err err = MP4NoErr;
+    *outTrack = nullptr;
+
+    u32 trackCount = 0;
+    err = MP4GetMovieTrackCount(moov, &trackCount);
+    if (err) return err;
+
+    LOG_DEBUG("Searching for IT35 track in {} tracks", trackCount);
+
+    // Search for IT35 metadata track
+    for (u32 i = 1; i <= trackCount; ++i) {
+        MP4Track trak = nullptr;
+        MP4Media media = nullptr;
+        u32 handlerType = 0;
+
+        err = MP4GetMovieIndTrack(moov, i, &trak);
+        if (err) continue;
+
+        err = MP4GetTrackMedia(trak, &media);
+        if (err) continue;
+
+        err = MP4GetMediaHandlerDescription(media, &handlerType, nullptr);
+        if (err) continue;
+
+        // Only metadata tracks
+        if (handlerType != MP4MetaHandlerType) continue;
+
+        u32 trackID = 0;
+        MP4GetTrackID(trak, &trackID);
+        LOG_DEBUG("Found metadata track with ID {}", trackID);
+
+        // Get first sample description
+        MP4Handle sampleEntryH = nullptr;
+        err = MP4NewHandle(0, &sampleEntryH);
+        if (err) continue;
+
+        err = MP4GetMediaSampleDescription(media, 1, sampleEntryH, nullptr);
+        if (err) {
+            MP4DisposeHandle(sampleEntryH);
+            continue;
+        }
+
+        // Check if it's 'it35'
+        u32 type = 0;
+        err = ISOGetSampleDescriptionType(sampleEntryH, &type);
+
+        if (err || type != MP4T35MetadataSampleEntryType) {
+            MP4DisposeHandle(sampleEntryH);
+            continue;
+        }
+
+        LOG_INFO("Found IT35 track with ID {}", trackID);
+
+        // TODO: Read t35C box from sample entry and verify prefix matches
+        // For now, we assume the prefix matches if we found an 'it35' track
+        // Future enhancement: Parse ExtensionAtomList to find t35C box and verify prefix
+
+        MP4DisposeHandle(sampleEntryH);
+
+        // Check for 'rndr' track reference
+        MP4Track videoTrack = nullptr;
+        err = MP4GetTrackReference(trak, MP4_FOUR_CHAR_CODE('r', 'n', 'd', 'r'), 1, &videoTrack);
+        if (err) {
+            LOG_WARN("IT35 track ID {} has no 'rndr' track reference, continuing anyway", trackID);
+        } else {
+            u32 videoTrackID = 0;
+            MP4GetTrackID(videoTrack, &videoTrackID);
+            LOG_DEBUG("IT35 track references video track ID {}", videoTrackID);
+        }
+
+        // Success!
+        *outTrack = trak;
+        return MP4NoErr;
+    }
+
+    LOG_ERROR("No IT35 metadata track found");
+    return MP4NotFoundErr;
+}
+
+bool DedicatedIt35Extractor::canExtract(const ExtractionConfig& config,
+                                         std::string& reason) const {
+    if (!config.movie) {
+        reason = "No movie provided";
+        return false;
+    }
+
+    // Try to find IT35 track
+    MP4Track track = nullptr;
+    MP4Err err = findIt35MetadataTrack(config.movie, config.t35Prefix, &track);
+
+    if (err) {
+        reason = "No dedicated IT35 metadata track found";
+        return false;
+    }
+
+    return true;
+}
+
+MP4Err DedicatedIt35Extractor::extract(const ExtractionConfig& config) {
+    LOG_INFO("Extracting metadata using dedicated-it35 extractor");
+    LOG_INFO("T.35 prefix: {}", config.t35Prefix);
+    LOG_INFO("Output path: {}", config.outputPath);
+
+    MP4Err err = MP4NoErr;
+    MP4Track it35Track = nullptr;
+
+    // Find IT35 track
+    LOG_DEBUG("Finding IT35 track");
+    err = findIt35MetadataTrack(config.movie, config.t35Prefix, &it35Track);
+    if (err) {
+        LOG_ERROR("Failed to find IT35 track (err={})", err);
+        return err;
+    }
+
+    // Get media and timescale
+    MP4Media it35Media = nullptr;
+    u32 timescale = 1000; // default
+    err = MP4GetTrackMedia(it35Track, &it35Media);
+    if (err != MP4NoErr) {
+        LOG_ERROR("Failed to get IT35 media (err={})", err);
+        return err;
+    }
+
+    err = MP4GetMediaTimeScale(it35Media, &timescale);
+    if (err != MP4NoErr) {
+        LOG_WARN("Failed to get timescale, using default 1000");
+        timescale = 1000;
+    }
+    LOG_DEBUG("IT35 track timescale: {}", timescale);
+
+    // Get sample count
+    u32 sampleCount = 0;
+    err = MP4GetMediaSampleCount(it35Media, &sampleCount);
+    if (err != MP4NoErr) {
+        LOG_ERROR("Failed to get sample count (err={})", err);
+        return err;
+    }
+    LOG_INFO("IT35 track has {} samples", sampleCount);
+
+    // Create output directory
+    namespace fs = std::filesystem;
+    fs::path outDir(config.outputPath);
+
+    if (!fs::exists(outDir)) {
+        if (!fs::create_directories(outDir)) {
+            LOG_ERROR("Failed to create output directory: {}", config.outputPath);
+            return MP4IOErr;
+        }
+    }
+
+    LOG_INFO("Extracting samples to {}", outDir.string());
+
+    // Extract all samples
+    std::vector<nlohmann::json> manifestItems;
+    u32 currentFrame = 0;
+
+    for (u32 i = 1; i <= sampleCount; ++i) {
+        MP4Handle sampleH = nullptr;
+        u32 sampleSize = 0;
+        u32 sampleFlags = 0;
+        u32 sampleDescIndex = 0;
+        u64 dts = 0;
+        u64 duration = 0;
+        s32 ctsOffset = 0;
+
+        err = MP4NewHandle(0, &sampleH);
+        if (err) {
+            LOG_ERROR("Failed to create sample handle (err={})", err);
+            return err;
+        }
+
+        err = MP4GetIndMediaSample(it35Media, i, sampleH, &sampleSize,
+                                   &dts, &ctsOffset, &duration,
+                                   &sampleFlags, &sampleDescIndex);
+
+        if (err) {
+            MP4DisposeHandle(sampleH);
+            LOG_ERROR("Failed to read sample {} (err={})", i, err);
+            return err;
+        }
+
+        // Calculate frame duration (simplification - would need video track info for accurate calculation)
+        u32 frameDuration = 1;
+        if (duration > 0 && timescale > 0) {
+            // Rough estimate: assume ~24-60fps
+            frameDuration = (u32)duration / (timescale / 60);
+            if (frameDuration == 0) frameDuration = 1;
+        }
+
+        // Write binary file
+        fs::path binFile = outDir / ("metadata_" + std::to_string(i) + ".bin");
+        std::ofstream out(binFile, std::ios::binary);
+        if (!out) {
+            LOG_ERROR("Failed to open {} for writing", binFile.string());
+            MP4DisposeHandle(sampleH);
+            return MP4IOErr;
+        }
+
+        // Samples are raw payloads (no box wrapper)
+        out.write((char*)*sampleH, sampleSize);
+        out.close();
+
+        LOG_INFO("Extracted sample {}: {} bytes, DTS={}, duration={} (frame {})",
+                i, sampleSize, dts, duration, currentFrame);
+
+        // Add to manifest
+        nlohmann::json item;
+        item["frame_start"] = currentFrame;
+        item["frame_duration"] = frameDuration;
+        item["binary_file"] = binFile.filename().string();
+        item["sample_size"] = sampleSize;
+        item["dts"] = static_cast<uint64_t>(dts);
+        item["duration_timescale"] = static_cast<uint64_t>(duration);
+        manifestItems.push_back(item);
+
+        currentFrame += frameDuration;
+
+        MP4DisposeHandle(sampleH);
+    }
+
+    LOG_INFO("Extracted {} metadata samples", sampleCount);
+
+    // Write manifest JSON
+    if (!manifestItems.empty()) {
+        nlohmann::json manifest;
+        manifest["t35_prefix"] = config.t35Prefix;
+        manifest["timescale"] = timescale;
+        manifest["sample_count"] = sampleCount;
+        manifest["items"] = manifestItems;
+
+        fs::path manifestFile = outDir / "manifest.json";
+        std::ofstream manifestOut(manifestFile);
+        if (manifestOut) {
+            manifestOut << manifest.dump(2);
+            manifestOut.close();
+            LOG_INFO("Wrote manifest to {}", manifestFile.string());
+        } else {
+            LOG_WARN("Failed to write manifest file");
+        }
+    }
+
+    LOG_INFO("Extraction complete");
+    return MP4NoErr;
+}
+
+} // namespace t35

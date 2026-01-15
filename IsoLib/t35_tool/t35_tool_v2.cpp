@@ -103,9 +103,7 @@ int doInject(const std::string& inputFile,
         }
 
         // Load metadata
-        LOG_INFO("Loading metadata from source...");
         MetadataMap items = source->load(prefix);
-        LOG_INFO("Loaded {} metadata items", items.size());
 
         // Validate metadata
         if (!validateMetadataMap(items, errorMsg)) {
@@ -141,7 +139,6 @@ int doInject(const std::string& inputFile,
         }
 
         // Inject
-        LOG_INFO("Injecting metadata...");
         err = strategy->inject(config, items, prefix);
         if (err) {
             LOG_ERROR("Injection failed with error: {}", err);
@@ -159,7 +156,6 @@ int doInject(const std::string& inputFile,
         }
 
         MP4DisposeMovie(movie);
-        LOG_INFO("✓ Injection complete!");
         return 0;
 
     } catch (const T35Exception& e) {
@@ -224,7 +220,6 @@ int doExtract(const std::string& inputFile,
         }
 
         // Extract
-        LOG_INFO("Extracting metadata...");
         err = strategy->extract(config);
         if (err) {
             LOG_ERROR("Extraction failed with error: {}", err);
@@ -233,7 +228,6 @@ int doExtract(const std::string& inputFile,
         }
 
         MP4DisposeMovie(movie);
-        LOG_INFO("✓ Extraction complete!");
         return 0;
 
     } catch (const T35Exception& e) {

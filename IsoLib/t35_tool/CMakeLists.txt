@@ -89,8 +89,10 @@ add_executable(
   injection/InjectionStrategy.cpp
   injection/MebxIt35Strategy.cpp
   injection/MebxMe4cStrategy.cpp
+  injection/DedicatedIt35Strategy.cpp
   extraction/ExtractionStrategy.cpp
   extraction/MebxIt35Extractor.cpp
+  extraction/DedicatedIt35Extractor.cpp
   extraction/AutoExtractor.cpp
 )
 
