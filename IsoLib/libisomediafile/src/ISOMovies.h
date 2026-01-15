@@ -861,14 +861,16 @@ extern "C"
    * @param theMovie Input movie object.
    * @param timescale Media timescale (typically matches video track timescale).
    * @param t35_prefix_text UTF-8 T.35 prefix string (e.g., "B500900001:SMPTE-ST2094-50").
-   * @param videoTrack Optional video track for 'rndr' reference (NULL if not needed).
+   * @param videoTrack Optional video track for track reference (NULL if not needed).
+   * @param trackReferenceType Track reference type or 0 for no reference.
    * @param outTrack Output; receives the created metadata track.
    * @param outMedia Optional output; receives the created media (NULL if not needed).
    * @return ISOErr code: MP4NoErr on success, error code otherwise.
    */
   ISO_EXTERN(ISOErr)
   ISONewT35MetadataTrack(MP4Movie theMovie, u32 timescale, const char *t35_prefix_text,
-                         MP4Track videoTrack, MP4Track *outTrack, MP4Media *outMedia);
+                         MP4Track videoTrack, u32 trackReferenceType, MP4Track *outTrack,
+                         MP4Media *outMedia);
 
   /*************************************************************************************************
    * VVC Sample descriptions

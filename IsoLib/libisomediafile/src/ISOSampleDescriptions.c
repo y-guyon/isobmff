@@ -2444,7 +2444,8 @@ bail:
 
 ISO_EXTERN(ISOErr)
 ISONewT35MetadataTrack(MP4Movie theMovie, u32 timescale, const char *t35_prefix_text,
-                       MP4Track videoTrack, MP4Track *outTrack, MP4Media *outMedia)
+                       MP4Track videoTrack, u32 trackReferenceType, MP4Track *outTrack,
+                       MP4Media *outMedia)
 {
   MP4Err err;
   MP4Track trakM                        = NULL;
@@ -2467,10 +2468,10 @@ ISONewT35MetadataTrack(MP4Movie theMovie, u32 timescale, const char *t35_prefix_
   err = MP4NewTrackMedia(trakM, &mediaM, MP4MetaHandlerType, timescale, NULL);
   if(err) goto bail;
 
-  /* Add track reference to video track if provided */
-  if(videoTrack != NULL)
+  /* Add track reference if both videoTrack and trackReferenceType are provided */
+  if(videoTrack != NULL && trackReferenceType != 0)
   {
-    err = MP4AddTrackReference(trakM, videoTrack, MP4_FOUR_CHAR_CODE('r', 'n', 'd', 'r'), 0);
+    err = MP4AddTrackReference(trakM, videoTrack, trackReferenceType, 0);
     if(err) goto bail;
   }
 

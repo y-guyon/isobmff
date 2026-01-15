@@ -77,6 +77,7 @@ enum
   MP4ObjectDescriptorAtomType                  = MP4_FOUR_CHAR_CODE('i', 'o', 'd', 's'),
   MP4ObjectDescriptorMediaHeaderAtomType       = MP4_FOUR_CHAR_CODE('o', 'd', 'h', 'd'),
   MP4ODTrackReferenceAtomType                  = MP4_FOUR_CHAR_CODE('m', 'p', 'o', 'd'),
+  MP4RndrTrackReferenceAtomType                = MP4_FOUR_CHAR_CODE('r', 'n', 'd', 'r'),
   MP4SampleDescriptionAtomType                 = MP4_FOUR_CHAR_CODE('s', 't', 's', 'd'),
   MP4SampleSizeAtomType                        = MP4_FOUR_CHAR_CODE('s', 't', 's', 'z'),
   MP4CompactSampleSizeAtomType                 = MP4_FOUR_CHAR_CODE('s', 't', 'z', '2'),
