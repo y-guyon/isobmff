@@ -130,10 +130,12 @@ public:
     std::vector<uint8_t>    getPayloadData();
     uint32_t                getTimeIntervalStart();
     uint32_t                getTimeintervalDuration();
+    int                     getVerboseLevel() const { return verboseLevel; }
 
     // Setters
     void                    setTimeIntervalStart(uint32_t frame_start);
     void                    setTimeintervalDuration(uint32_t frame_duration);
+    void                    setVerboseLevel(int level);
 
 
     void dbgPrintMetadataItems(bool decode);
@@ -154,6 +156,9 @@ private:
     bool hasSlopeParameter[MAX_NB_ALTERNATE];
 
     SyntaxElements elm;
+    
+    // Verbose level control
+    int verboseLevel;
 };
 
 #endif // SMPTE_ST2094_50_HPP
