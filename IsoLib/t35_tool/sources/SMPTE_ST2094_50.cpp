@@ -371,6 +371,8 @@ if (j.contains("baselineHdrHeadroom") )
     }
   }
 }
+
+dbgPrintMetadataItems(false);
 return error_raised;
 }
 
@@ -634,7 +636,6 @@ if (elm.has_adaptive_tone_map_flag) {
     payloadBinaryData.payload.pop_back();
 }
 
-// outFile.close(); // Close the file
 logMsg(LOGLEVEL_DEBUG, "End SMPTE_ST2094_50::writeSyntaxElementsToBinaryData");
 }
 
@@ -912,6 +913,7 @@ void SMPTE_ST2094_50::convertSyntaxElementsToMetadataItems(){
         }
     }
   }
+  dbgPrintMetadataItems(true);
 }
 
 nlohmann::json SMPTE_ST2094_50::encodeMetadataItemsToJson() {
@@ -992,48 +994,51 @@ void SMPTE_ST2094_50::dbgPrintMetadataItems(bool decode) {
         return;
     }
 
-    std::cout << "============================================= METADATA ITEMS ========================================================================\n";
+    logMsg(LOGLEVEL_DEBUG, "Start SMPTE_ST2094_50::dbgPrintMetadataItems");
     std::cout <<"windowNumber=" << pWin.windowNumber << "\n";
     std::cout <<"hdrReferenceWhite=" << cvt.hdrReferenceWhite << "\n";
-    std::cout <<"baselineHdrHeadroom=" << cvt.hatm.baselineHdrHeadroom << "\n";
-    if ( isHeadroomAdaptiveToneMap || decode) {
-      std::cout <<"numAlternateImages=" << cvt.hatm.numAlternateImages << "\n";
-  
-      std::cout << "gainApplicationSpaceChromaticities=[" ;
-      for (float val : cvt.hatm.gainApplicationSpaceChromaticities) {
-        std::cout << val << ", ";
-      }
-      std::cout << "]" << std::endl;
-  
-      for (uint32_t iAlt = 0; iAlt < cvt.hatm.numAlternateImages; iAlt++) {
-        std::cout <<"alternateHdrHeadroom=" << cvt.hatm.alternateHdrHeadroom[iAlt] << "\n";
-        std::cout <<"componentMixRed=" << cvt.hatm.cgf[iAlt].cm.componentMixRed << "\n";
-        std::cout <<"componentMixGreen=" << cvt.hatm.cgf[iAlt].cm.componentMixGreen << "\n";
-        std::cout <<"componentMixBlue=" << cvt.hatm.cgf[iAlt].cm.componentMixBlue << "\n";
-        std::cout <<"componentMixMax=" << cvt.hatm.cgf[iAlt].cm.componentMixMax << "\n";
-        std::cout <<"componentMixMin=" << cvt.hatm.cgf[iAlt].cm.componentMixMin << "\n";
-        std::cout <<"componentMixComponent=" << cvt.hatm.cgf[iAlt].cm.componentMixComponent << "\n";
-  
-        std::cout <<"gainCurveNumControlPoints=" << cvt.hatm.cgf[iAlt].gc.gainCurveNumControlPoints << "\n";
-  
-        std::cout << "gainCurveControlPointX=[" << std::endl;
-        for (float val : cvt.hatm.cgf[iAlt].gc.gainCurveControlPointX) {
-            std::cout << val << ", ";
-        }
-        std::cout << "]" << std::endl;
-  
-        std::cout << "gainCurveControlPointY=[" << std::endl;
-        for (float val : cvt.hatm.cgf[iAlt].gc.gainCurveControlPointY) {
-            std::cout << val << ", ";
-        }
-        std::cout << "]" << std::endl;
-  
-        std::cout << "gainCurveControlPointTheta=[" << std::endl;
-        for (float val : cvt.hatm.cgf[iAlt].gc.gainCurveControlPointTheta) {
-            std::cout << val << ", ";
-        }
-        std::cout << "]" << std::endl;
+    if ( isHeadroomAdaptiveToneMap)
+    {
+      std::cout <<"baselineHdrHeadroom=" << cvt.hatm.baselineHdrHeadroom << "\n";
+      if ( !isReferenceWhiteToneMapping) {
+          std::cout <<"numAlternateImages=" << cvt.hatm.numAlternateImages << "\n";
+          
+          std::cout << "gainApplicationSpaceChromaticities=[" ;
+          for (float val : cvt.hatm.gainApplicationSpaceChromaticities) {
+              std::cout << val << ", ";
+          }
+          std::cout << "]" << std::endl;
+          
+          for (uint32_t iAlt = 0; iAlt < cvt.hatm.numAlternateImages; iAlt++) {
+              std::cout <<"alternateHdrHeadroom=" << cvt.hatm.alternateHdrHeadroom[iAlt] << "\n";
+              std::cout <<"componentMixRed=" << cvt.hatm.cgf[iAlt].cm.componentMixRed << "\n";
+              std::cout <<"componentMixGreen=" << cvt.hatm.cgf[iAlt].cm.componentMixGreen << "\n";
+              std::cout <<"componentMixBlue=" << cvt.hatm.cgf[iAlt].cm.componentMixBlue << "\n";
+              std::cout <<"componentMixMax=" << cvt.hatm.cgf[iAlt].cm.componentMixMax << "\n";
+              std::cout <<"componentMixMin=" << cvt.hatm.cgf[iAlt].cm.componentMixMin << "\n";
+              std::cout <<"componentMixComponent=" << cvt.hatm.cgf[iAlt].cm.componentMixComponent << "\n";
+              
+              std::cout <<"gainCurveNumControlPoints=" << cvt.hatm.cgf[iAlt].gc.gainCurveNumControlPoints << "\n";
+              
+              std::cout << "gainCurveControlPointX=[" << std::endl;
+              for (float val : cvt.hatm.cgf[iAlt].gc.gainCurveControlPointX) {
+                  std::cout << val << ", ";
+              }
+              std::cout << "]" << std::endl;
+              
+              std::cout << "gainCurveControlPointY=[" << std::endl;
+              for (float val : cvt.hatm.cgf[iAlt].gc.gainCurveControlPointY) {
+                  std::cout << val << ", ";
+              }
+              std::cout << "]" << std::endl;
+              
+              std::cout << "gainCurveControlPointTheta=[" << std::endl;
+              for (float val : cvt.hatm.cgf[iAlt].gc.gainCurveControlPointTheta) {
+                  std::cout << val << ", ";
+              }
+              std::cout << "]" << std::endl;
+          }
       }
     }
-    std::cout << "===================================================================================================================================]\n";
+    logMsg(LOGLEVEL_DEBUG, "End SMPTE_ST2094_50::dbgPrintMetadataItems");
   }
