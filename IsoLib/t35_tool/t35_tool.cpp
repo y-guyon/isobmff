@@ -715,10 +715,10 @@ static MP4Err getMebxAndVideoTrackReaders(MP4Movie moov,
 
     // --- Step 3.2: select the key ---
     u32 local_key_id = 0;
-    err = MP4SelectMebxTrackReaderKey(mebxReader, key_namespace, key_value, &local_key_id);
+    err = MP4SelectFirstMebxTrackReaderKey(mebxReader, key_namespace, key_value, &local_key_id);
     if(err) 
     {
-      std::cerr << "MP4SelectMebxTrackReaderKey failed (err=" << err << ")\n";
+      std::cerr << "MP4SelectFirstMebxTrackReaderKey failed (err=" << err << ")\n";
       MP4DisposeHandle(key_value);
       MP4DisposeTrackReader(mebxReader);
       continue;
@@ -952,10 +952,10 @@ static MP4Err dumpHevcWithMebxSei(MP4Movie moov, const std::string& inputFile, c
   err = stringToHandle(t35PrefixHex, &key_value, STRING_TO_HANDLE_MODE);
   if (err) return err;
   u32 local_key_id = 0;
-  err = MP4SelectMebxTrackReaderKey(mebxReader, key_namespace, key_value, &local_key_id);
+  err = MP4SelectFirstMebxTrackReaderKey(mebxReader, key_namespace, key_value, &local_key_id);
   if(err) 
   {
-    std::cerr << "MP4SelectMebxTrackReaderKey failed (err=" << err << ")\n";
+    std::cerr << "MP4SelectFirstMebxTrackReaderKey failed (err=" << err << ")\n";
     MP4DisposeHandle(key_value);
     MP4DisposeTrackReader(mebxReader);
     return err;

@@ -114,11 +114,11 @@ static MP4Err findMebxTrackReader(MP4Movie moov,
                  t35PrefixStr, t35PrefixStr.size());
 
         u32 local_key_id = 0;
-        err = MP4SelectMebxTrackReaderKey(reader, key_namespace, key_value, &local_key_id);
+        err = MP4SelectFirstMebxTrackReaderKey(reader, key_namespace, key_value, &local_key_id);
         MP4DisposeHandle(key_value);
 
         if (err) {
-            LOG_DEBUG("MP4SelectMebxTrackReaderKey failed for track {} (err={})", trackID, err);
+            LOG_DEBUG("MP4SelectFirstMebxTrackReaderKey failed for track {} (err={})", trackID, err);
             MP4DisposeTrackReader(reader);
             continue;
         }

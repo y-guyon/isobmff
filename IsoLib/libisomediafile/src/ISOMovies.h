@@ -313,7 +313,7 @@ extern "C"
 #define ISONewUserData MP4NewUserData
 #define ISOCreateTrackReader MP4CreateTrackReader
 #define ISOSetMebxTrackReaderLocalKeyId MP4SetMebxTrackReaderLocalKeyId
-#define ISOSelectMebxTrackReaderKey MP4SelectMebxTrackReaderKey
+#define ISOSelectFirstMebxTrackReaderKey MP4SelectFirstMebxTrackReaderKey
 #define ISODisposeTrackReader MP4DisposeTrackReader
 #define ISONewHandle MP4NewHandle
 #define ISOSetHandleSize MP4SetHandleSize

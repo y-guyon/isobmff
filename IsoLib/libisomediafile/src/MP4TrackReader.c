@@ -269,15 +269,15 @@ bail:
 }
 
 MP4_EXTERN(MP4Err)
-MP4SelectMebxTrackReaderKey(MP4TrackReader theReader, u32 key_namespace, MP4Handle key_value,
-                            u32 *outLocalKeyId)
+MP4SelectFirstMebxTrackReaderKey(MP4TrackReader theReader, u32 key_namespace, MP4Handle key_value,
+                                 u32 *outLocalKeyId)
 {
   MP4TrackReaderPtr reader;
   MP4Handle sampleEntryH = NULL;
   MP4Err err             = MP4NoErr;
   u32 key_cnt            = 0;
   u32 found_local_id     = 0;
-  u32 found_count        = 0;
+  int found              = 0;
 
   if((theReader == 0) || (key_value == 0)) BAILWITHERROR(MP4BadParamErr);
   reader = (MP4TrackReaderPtr)theReader;
@@ -315,17 +315,17 @@ MP4SelectMebxTrackReaderKey(MP4TrackReader theReader, u32 key_namespace, MP4Hand
 
       if(inSize == valSize && memcmp(*key_value, *valH, inSize) == 0)
       {
-        if(found_count == 0)
-        {
-          found_local_id = local_id;
-        }
-        found_count++;
+        /* Found first match - save it and stop searching */
+        found_local_id = local_id;
+        found = 1;
+        MP4DisposeHandle(valH);
+        break;
       }
     }
     MP4DisposeHandle(valH);
   }
 
-  if(found_count == 0)
+  if(!found)
   {
     err = MP4NotFoundErr;
     goto bail;
@@ -335,15 +335,72 @@ MP4SelectMebxTrackReaderKey(MP4TrackReader theReader, u32 key_namespace, MP4Hand
   reader->mebx_local_key_id = found_local_id;
   if(outLocalKeyId) *outLocalKeyId = found_local_id;
 
-  /* Multiple matches: still set first, but warn */
-  if(found_count > 1)
-  {
-    err = MP4DuplicateErr;
-    goto bail;
-  }
+  /* Note: This function selects the first match only.
+   * Use MP4FindMebxKeyMatchByIndex to iterate through all matches. */
 
 bail:
   if(sampleEntryH) MP4DisposeHandle(sampleEntryH);
+  TEST_RETURN(err);
+  return err;
+}
+
+MP4_EXTERN(MP4Err)
+MP4FindMebxKeyMatchByIndex(MP4Handle sampleEntryH, u32 key_namespace, MP4Handle key_value,
+                           u32 matchIndex, u32 *outAbsoluteIndex, u32 *outLocalKeyId)
+{
+  MP4Err err         = MP4NoErr;
+  u32 key_cnt        = 0;
+  u32 found_count    = 0;
+
+  if((sampleEntryH == NULL) || (key_value == NULL)) BAILWITHERROR(MP4BadParamErr);
+
+  err = ISOGetMebxMetadataCount(sampleEntryH, &key_cnt);
+  if(err) goto bail;
+
+  for(u32 i = 0; i < key_cnt; i++)
+  {
+    u32 local_id   = 0;
+    u32 ns         = 0;
+    MP4Handle valH = NULL;
+
+    err = MP4NewHandle(0, &valH);
+    if(err) goto bail;
+
+    err = ISOGetMebxMetadataConfig(sampleEntryH, i, &local_id, &ns, valH, NULL, NULL);
+    if(err)
+    {
+      MP4DisposeHandle(valH);
+      goto bail;
+    }
+
+    /* Check if this key and value matches */
+    if(ns == key_namespace)
+    {
+      u32 inSize = 0, valSize = 0;
+      MP4GetHandleSize(key_value, &inSize);
+      MP4GetHandleSize(valH, &valSize);
+
+      if(inSize == valSize && memcmp(*key_value, *valH, inSize) == 0)
+      {
+        /* This is a match - check if it's the one we're looking for */
+        if(found_count == matchIndex)
+        {
+          /* Found the requested match */
+          if(outAbsoluteIndex) *outAbsoluteIndex = i;
+          if(outLocalKeyId) *outLocalKeyId = local_id;
+          MP4DisposeHandle(valH);
+          goto bail;
+        }
+        found_count++;
+      }
+    }
+    MP4DisposeHandle(valH);
+  }
+
+  /* If we get here, matchIndex was beyond available matches */
+  err = MP4NotFoundErr;
+
+bail:
   TEST_RETURN(err);
   return err;
 }

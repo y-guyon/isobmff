@@ -65,6 +65,7 @@ static MP4Err findMebxMe4cTrackReader(MP4Movie moov,
         err = MP4CreateTrackReader(trak, &reader);
         if (err) continue;
 
+        // Get sample description (we'll reuse this for both type checking and metadata config)
         MP4Handle sampleEntryH = nullptr;
         err = MP4NewHandle(0, &sampleEntryH);
         if (err) {
@@ -72,7 +73,6 @@ static MP4Err findMebxMe4cTrackReader(MP4Movie moov,
             continue;
         }
 
-        // Get current sample description
         err = MP4TrackReaderGetCurrentSampleDescription(reader, sampleEntryH);
         if (err) {
             MP4DisposeHandle(sampleEntryH);
@@ -84,10 +84,9 @@ static MP4Err findMebxMe4cTrackReader(MP4Movie moov,
         u32 type = 0;
         err = ISOGetSampleDescriptionType(sampleEntryH, &type);
 
-        MP4DisposeHandle(sampleEntryH);
-        MP4DisposeTrackReader(reader); // Dispose the temporary reader
-
         if (err || type != MP4BoxedMetadataSampleEntryType) {
+            MP4DisposeHandle(sampleEntryH);
+            MP4DisposeTrackReader(reader);
             continue;
         }
 
@@ -98,6 +97,8 @@ static MP4Err findMebxMe4cTrackReader(MP4Movie moov,
         err = MP4GetTrackReference(trak, MP4_FOUR_CHAR_CODE('r', 'n', 'd', 'r'), 1, &videoTrack);
         if (err) {
             LOG_WARN("Mebx track ID {} has no 'rndr' track reference, skipping", trackID);
+            MP4DisposeHandle(sampleEntryH);
+            MP4DisposeTrackReader(reader);
             continue;
         }
 
@@ -105,15 +106,12 @@ static MP4Err findMebxMe4cTrackReader(MP4Movie moov,
         MP4GetTrackID(videoTrack, &videoTrackID);
         LOG_DEBUG("Mebx track references video track ID {}", videoTrackID);
 
-        // Create a fresh reader for key selection
-        err = MP4CreateTrackReader(trak, &reader);
-        if (err) return err;
-
         // Try to select the me4c namespace key with 'it35' key_value
         u32 key_namespace = MP4_FOUR_CHAR_CODE('m', 'e', '4', 'c');
         MP4Handle key_value = nullptr;
         err = MP4NewHandle(4, &key_value);
         if (err) {
+            MP4DisposeHandle(sampleEntryH);
             MP4DisposeTrackReader(reader);
             return err;
         }
@@ -134,6 +132,7 @@ static MP4Err findMebxMe4cTrackReader(MP4Movie moov,
 
         if (err) {
             LOG_DEBUG("MP4SelectMebxTrackReaderKey failed for track {} (err={})", trackID, err);
+            MP4DisposeHandle(sampleEntryH);
             MP4DisposeTrackReader(reader);
             continue;
         }
@@ -141,11 +140,94 @@ static MP4Err findMebxMe4cTrackReader(MP4Movie moov,
         LOG_INFO("Selected mebx me4c track ID {} with local_key_id = '{}' (0x{:08X})",
                  trackID, fourCCToString(local_key_id), local_key_id);
 
-        // Note: For me4c namespace, the T.35 prefix is stored in setupInfo parameter
-        // However, ISOGetMebxMetadataConfig API currently returns errors when trying
-        // to retrieve it. For now, we rely on the successful key selection with 'it35'
-        // 4CC as sufficient verification that this is the correct track.
-        // TODO: Investigate why ISOGetMebxMetadataConfig fails and add setupInfo verification
+        // Verify the T.35 prefix stored in setupInfo parameter
+        // Reuse the sampleEntryH we already got above
+
+        // Get metadata configuration for the selected key (idx=0 for first key)
+        u32 read_local_key_id = 0;
+        u32 read_key_namespace = 0;
+        MP4Handle read_key_value = nullptr;
+        MP4Handle setupInfoH = nullptr;
+        char* locale_string = nullptr;
+
+        err = MP4NewHandle(0, &read_key_value);
+        if (err) {
+            LOG_ERROR("Failed to create read_key_value handle (err={})", err);
+            MP4DisposeHandle(sampleEntryH);
+            MP4DisposeTrackReader(reader);
+            continue;
+        }
+
+        err = MP4NewHandle(0, &setupInfoH);
+        if (err) {
+            LOG_ERROR("Failed to create setupInfo handle (err={})", err);
+            MP4DisposeHandle(read_key_value);
+            MP4DisposeHandle(sampleEntryH);
+            MP4DisposeTrackReader(reader);
+            continue;
+        }
+
+        LOG_DEBUG("Calling ISOGetMebxMetadataConfig with idx=0");
+        err = ISOGetMebxMetadataConfig(sampleEntryH, 0, &read_local_key_id, &read_key_namespace,
+                                       read_key_value, &locale_string, setupInfoH);
+
+        if (err) {
+            LOG_WARN("ISOGetMebxMetadataConfig failed (err={})", err);
+            LOG_DEBUG("  read_local_key_id = 0x{:08X}", read_local_key_id);
+            LOG_DEBUG("  read_key_namespace = 0x{:08X} ('{}')", read_key_namespace,
+                     fourCCToString(read_key_namespace));
+            MP4DisposeHandle(setupInfoH);
+            MP4DisposeHandle(read_key_value);
+            MP4DisposeHandle(sampleEntryH);
+            // Continue anyway - rely on successful key selection
+        } else {
+            LOG_DEBUG("ISOGetMebxMetadataConfig succeeded");
+            LOG_DEBUG("  read_local_key_id = 0x{:08X} ('{}')", read_local_key_id,
+                     fourCCToString(read_local_key_id));
+            LOG_DEBUG("  read_key_namespace = 0x{:08X} ('{}')", read_key_namespace,
+                     fourCCToString(read_key_namespace));
+
+            // Check setupInfo contains the T.35 prefix
+            u32 setupInfoSize = 0;
+            MP4GetHandleSize(setupInfoH, &setupInfoSize);
+            LOG_DEBUG("  setupInfo size = {} bytes", setupInfoSize);
+
+            if (setupInfoSize > 0) {
+                // setupInfo should contain the T.35 prefix as a null-terminated string
+                std::string setupInfoStr((char*)*setupInfoH, setupInfoSize);
+                LOG_DEBUG("  setupInfo = '{}'", setupInfoStr);
+
+                // Parse both prefixes to compare hex part only
+                T35Prefix requestedPrefix(t35PrefixStr);
+                T35Prefix filePrefix(setupInfoStr);
+
+                // Verify hex prefix matches (ignore description)
+                if (requestedPrefix.hex() != filePrefix.hex()) {
+                    LOG_WARN("T.35 hex in setupInfo '{}' does not match requested hex '{}'",
+                            filePrefix.hex(), requestedPrefix.hex());
+                    MP4DisposeHandle(setupInfoH);
+                    MP4DisposeHandle(read_key_value);
+                    MP4DisposeHandle(sampleEntryH);
+                    MP4DisposeTrackReader(reader);
+                    continue;  // Try next track
+                }
+                LOG_DEBUG("T.35 hex matches requested hex");
+
+                // Warn if descriptions differ (informative only)
+                if (!requestedPrefix.description().empty() &&
+                    !filePrefix.description().empty() &&
+                    requestedPrefix.description() != filePrefix.description()) {
+                    LOG_WARN("T.35 description mismatch: requested '{}' but file has '{}'",
+                            requestedPrefix.description(), filePrefix.description());
+                }
+            } else {
+                LOG_WARN("setupInfo is empty, cannot verify T.35 prefix");
+            }
+
+            MP4DisposeHandle(setupInfoH);
+            MP4DisposeHandle(read_key_value);
+            MP4DisposeHandle(sampleEntryH);
+        }
 
         // Success!
         *outReader = reader;

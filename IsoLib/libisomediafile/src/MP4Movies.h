@@ -1764,11 +1764,14 @@ extern "C"
    */
   MP4_EXTERN(MP4Err) MP4SetMebxTrackReaderLocalKeyId(MP4TrackReader theReader, u32 local_key_id);
   /**
-   * @brief Select a 'mebx' key for a track reader by namespace and value.
+   * @brief Select the first matching 'mebx' key for a track reader by namespace and value.
    *
-   * Looks up a key in the 'mebx' sample description matching @p key_namespace and @p key_value. If
-   * found, sets the corresponding local_key_id on the reader. Optionally returns the resolved
+   * Looks up the first key in the 'mebx' sample description matching @p key_namespace and @p key_value.
+   * If found, sets the corresponding local_key_id on the reader. Optionally returns the resolved
    * local_key_id.
+   *
+   * If multiple keys match the same namespace and value, this function selects only the first one.
+   * Use MP4FindMebxKeyMatchByIndex to iterate through all matches.
    *
    * @param theReader 'mebx' track reader.
    * @param key_namespace key namespace from MetadataKeyDeclarationBox
@@ -1778,8 +1781,29 @@ extern "C"
    * @return MP4NoErr if found and set, MP4NotFoundErr if not found, or error code.
    */
   MP4_EXTERN(MP4Err)
-  MP4SelectMebxTrackReaderKey(MP4TrackReader theReader, u32 key_namespace, MP4Handle key_value,
-                              u32 *outLocalKeyId);
+  MP4SelectFirstMebxTrackReaderKey(MP4TrackReader theReader, u32 key_namespace, MP4Handle key_value,
+                                   u32 *outLocalKeyId);
+
+  /**
+   * @brief Find a specific match of key_namespace + key_value by match index.
+   *
+   * This function searches for all entries matching the given key_namespace and key_value,
+   * and returns information about the match at the specified index (0-based).
+   *
+   * Use this to iterate through all matches when multiple entries have the same
+   * key_namespace and key_value but different setupInfo or other parameters.
+   *
+   * @param sampleEntryH Handle to the mebx sample entry
+   * @param key_namespace Namespace to match
+   * @param key_value Handle containing the key value to match
+   * @param matchIndex Zero-based index of which match to return (0=first match, 1=second, etc.)
+   * @param outAbsoluteIndex Output: absolute index in metadata config array (for use with ISOGetMebxMetadataConfig)
+   * @param outLocalKeyId Output: local_key_id for this match
+   * @return MP4NoErr if match found, MP4NotFoundErr if matchIndex exceeds available matches
+   */
+  MP4_EXTERN(MP4Err)
+  MP4FindMebxKeyMatchByIndex(MP4Handle sampleEntryH, u32 key_namespace, MP4Handle key_value,
+                             u32 matchIndex, u32 *outAbsoluteIndex, u32 *outLocalKeyId);
 
   /**
    * @brief Frees up resources associated with a track reader.
