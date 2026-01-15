@@ -114,7 +114,7 @@ bool GenericJsonSource::validate(std::string& errorMsg) {
     }
 }
 
-MetadataMap GenericJsonSource::load(const T35Prefix& prefix) {
+MetadataMap GenericJsonSource::load(const T35Prefix& /* prefix */) {
     LOG_INFO("Loading metadata from GenericJsonSource: {}", path);
 
     // Validate first

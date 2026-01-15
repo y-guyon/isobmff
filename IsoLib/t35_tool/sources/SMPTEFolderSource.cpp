@@ -51,7 +51,7 @@ bool SMPTEFolderSource::validate(std::string& errorMsg) {
     return true;
 }
 
-MetadataMap SMPTEFolderSource::load(const T35Prefix& prefix) {
+MetadataMap SMPTEFolderSource::load(const T35Prefix& /* prefix */) {
     LOG_INFO("Loading SMPTE ST2094-50 metadata from folder: {}", path);
 
     // Validate first

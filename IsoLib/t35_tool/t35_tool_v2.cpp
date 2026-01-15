@@ -46,20 +46,18 @@ void printAvailableOptions() {
     std::cout << "  smpte-folder (or json-folder)    - Folder with SMPTE ST2094-50 JSON files\n";
     std::cout << "\n";
     std::cout << "Available injection methods:\n";
-    std::cout << "  mebx-it35                - MEBX track with it35 namespace (default)\n";
-    std::cout << "  mebx-me4c                - MEBX track with me4c namespace (stub)\n";
-    std::cout << "  dedicated-it35           - Dedicated metadata track (stub)\n";
+    std::cout << "  mebx-me4c                - MEBX track with me4c namespace (default)\n";
+    std::cout << "  mebx-it35                - MEBX track with it35 namespace\n";
+    std::cout << "  dedicated-it35           - Dedicated metadata track\n";
     std::cout << "  sample-group             - Sample group (stub)\n";
-    std::cout << "  sample-entry-box         - Box in sample entry (stub)\n";
     std::cout << "  default-sample-group     - Default sample group (stub)\n";
     std::cout << "\n";
     std::cout << "Available extraction methods:\n";
     std::cout << "  auto                     - Auto-detect (default)\n";
     std::cout << "  mebx-it35                - MEBX with it35 namespace\n";
-    std::cout << "  mebx-me4c                - MEBX with me4c namespace (stub)\n";
-    std::cout << "  dedicated-it35           - Dedicated metadata track (stub)\n";
+    std::cout << "  mebx-me4c                - MEBX with me4c namespace\n";
+    std::cout << "  dedicated-it35           - Dedicated metadata track\n";
     std::cout << "  sample-group             - Sample group (stub)\n";
-    std::cout << "  sample-entry-box         - Sample entry box (stub)\n";
     std::cout << "  sei                      - Convert to video with SEI (stub)\n";
     std::cout << "\n";
 }
@@ -72,8 +70,7 @@ int doInject(const std::string& inputFile,
             const std::string& outputFile,
             const std::string& sourceSpec,
             const std::string& methodName,
-            const std::string& prefixStr,
-            int verbose) {
+            const std::string& prefixStr) {
 
     LOG_INFO("=== T.35 Metadata Injection ===");
     LOG_INFO("Input:  {}", inputFile);
@@ -174,8 +171,7 @@ int doInject(const std::string& inputFile,
 int doExtract(const std::string& inputFile,
              const std::string& outputPath,
              const std::string& methodName,
-             const std::string& prefixStr,
-             int verbose) {
+             const std::string& prefixStr) {
 
     LOG_INFO("=== T.35 Metadata Extraction ===");
     LOG_INFO("Input:  {}", inputFile);
@@ -263,14 +259,14 @@ int main(int argc, char** argv) {
     auto inject = app.add_subcommand("inject", "Inject metadata into MP4");
 
     std::string injectInput, injectOutput, injectSource;
-    std::string injectMethod = "mebx-it35";
+    std::string injectMethod = "mebx-me4c";
     std::string injectPrefix = "B500900001:SMPTE-ST2094-50";
 
     inject->add_option("input", injectInput, "Input MP4 file")->required();
     inject->add_option("output", injectOutput, "Output MP4 file")->required();
     inject->add_option("--source,-s", injectSource, "Source spec (type:path)")->required();
     inject->add_option("--method,-m", injectMethod, "Injection method")
-        ->default_val("mebx-it35");
+        ->default_val("mebx-me4c");
     inject->add_option("--t35-prefix,-p", injectPrefix, "T.35 prefix (hex[:description])")
         ->default_val("B500900001:SMPTE-ST2094-50");
 
@@ -303,10 +299,10 @@ int main(int argc, char** argv) {
     // Execute subcommand
     if (*inject) {
         return doInject(injectInput, injectOutput, injectSource,
-                       injectMethod, injectPrefix, verbose);
+                       injectMethod, injectPrefix);
     } else if (*extract) {
         return doExtract(extractInput, extractOutput,
-                        extractMethod, extractPrefix, verbose);
+                        extractMethod, extractPrefix);
     } else {
         std::cout << app.help() << "\n";
         return 0;

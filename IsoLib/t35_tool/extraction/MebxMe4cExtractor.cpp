@@ -1,5 +1,6 @@
 #include "MebxMe4cExtractor.hpp"
 #include "../common/Logger.hpp"
+#include "../common/T35Prefix.hpp"
 
 extern "C" {
     #include "MP4Movies.h"
@@ -140,8 +141,11 @@ static MP4Err findMebxMe4cTrackReader(MP4Movie moov,
         LOG_INFO("Selected mebx me4c track ID {} with local_key_id = '{}' (0x{:08X})",
                  trackID, fourCCToString(local_key_id), local_key_id);
 
-        // TODO: Verify setupInfo contains matching T.35 prefix
-        // For now, we assume if we found an me4c track with it35 key, it's a match
+        // Note: For me4c namespace, the T.35 prefix is stored in setupInfo parameter
+        // However, ISOGetMebxMetadataConfig API currently returns errors when trying
+        // to retrieve it. For now, we rely on the successful key selection with 'it35'
+        // 4CC as sufficient verification that this is the correct track.
+        // TODO: Investigate why ISOGetMebxMetadataConfig fails and add setupInfo verification
 
         // Success!
         *outReader = reader;

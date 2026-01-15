@@ -1,5 +1,6 @@
 #include "DedicatedIt35Extractor.hpp"
 #include "../common/Logger.hpp"
+#include "../common/T35Prefix.hpp"
 
 extern "C" {
     #include "MP4Movies.h"
@@ -69,9 +70,40 @@ static MP4Err findIt35MetadataTrack(MP4Movie moov,
 
         LOG_INFO("Found IT35 track with ID {}", trackID);
 
-        // TODO: Read t35C box from sample entry and verify prefix matches
-        // For now, we assume the prefix matches if we found an 'it35' track
-        // Future enhancement: Parse ExtensionAtomList to find t35C box and verify prefix
+        // Read t35C box from sample entry and verify prefix matches
+        MP4GenericAtom t35CAtom = nullptr;
+        err = ISOGetAtomFromSampleDescription(sampleEntryH, MP4T35CommonHeaderBoxType, &t35CAtom);
+
+        if (err == MP4NoErr && t35CAtom) {
+            MP4T35CommonHeaderBoxPtr t35C = (MP4T35CommonHeaderBoxPtr)t35CAtom;
+            if (t35C->t35_prefix_text) {
+                std::string prefixInFile(t35C->t35_prefix_text);
+                LOG_DEBUG("Found t35C box with prefix: '{}'", prefixInFile);
+
+                // Parse both prefixes to compare hex part only
+                T35Prefix requestedPrefix(t35PrefixStr);
+                T35Prefix filePrefix(prefixInFile);
+
+                // Verify hex prefix matches (ignore description)
+                if (requestedPrefix.hex() != filePrefix.hex()) {
+                    LOG_DEBUG("T35 hex '{}' does not match requested hex '{}'",
+                             filePrefix.hex(), requestedPrefix.hex());
+                    MP4DisposeHandle(sampleEntryH);
+                    continue;  // Try next track
+                }
+                LOG_DEBUG("T35 hex matches requested hex");
+
+                // Warn if descriptions differ (informative only)
+                if (!requestedPrefix.description().empty() &&
+                    !filePrefix.description().empty() &&
+                    requestedPrefix.description() != filePrefix.description()) {
+                    LOG_WARN("T.35 description mismatch: requested '{}' but file has '{}'",
+                            requestedPrefix.description(), filePrefix.description());
+                }
+            }
+        } else {
+            LOG_WARN("Could not read t35C box from IT35 sample entry");
+        }
 
         MP4DisposeHandle(sampleEntryH);
 

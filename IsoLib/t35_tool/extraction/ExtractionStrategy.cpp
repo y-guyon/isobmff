@@ -19,7 +19,6 @@ std::unique_ptr<ExtractionStrategy> createExtractionStrategy(const std::string& 
     } else if (strategyName == "dedicated-it35") {
         return std::make_unique<DedicatedIt35Extractor>();
     } else if (strategyName == "sample-group" ||
-               strategyName == "sample-entry-box" ||
                strategyName == "sei") {
         throw T35Exception(T35Error::NotImplemented,
                           "Extraction strategy '" + strategyName + "' is not yet implemented");
