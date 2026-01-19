@@ -28,7 +28,7 @@ public:
     bool canExtract(const ExtractionConfig& config,
                    std::string& reason) override;
 
-    MP4Err extract(const ExtractionConfig& config) override;
+    MP4Err extract(const ExtractionConfig& config, MetadataMap* outItems = nullptr) override;
 
 private:
     // Cache the track found in canExtract() for use in extract()

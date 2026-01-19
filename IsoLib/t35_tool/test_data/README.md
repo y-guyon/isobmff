@@ -1,15 +1,26 @@
-# Test Data for GenericJsonSource
+# Test Data for t35_tool
 
-This directory contains test files for validating the GenericJsonSource implementation.
+This directory contains test files for validating the t35_tool implementation.
 
-## Files
+## Test Files Overview
 
+### GenericJsonSource Test Files
 - `test_manifest.json` - JSON manifest file with metadata items
 - `meta_001.bin` - Binary metadata payload for frames 0-23 (16 bytes)
 - `meta_002.bin` - Binary metadata payload for frames 24-47 (16 bytes)
 - `meta_003.bin` - Binary metadata payload for frames 48-71 (16 bytes)
 
-## JSON Schema
+### SMPTE Folder Source Test Files
+- `ExampleJson/` - Directory containing SMPTE ST 2094-50 metadata in JSON format
+  - `ST2094-50_ReferenceWhiteOnly_metadataItems.json` - Reference white level only
+  - `ST2094-50_DefaultToneMapping_metadataItems.json` - Default tone mapping parameters
+  - `ST2094-50_CustomToneMapping_metadataItems.json` - Custom tone mapping parameters
+- `ST2094-50_LightDetector.mov` - Sample HEVC video file for testing injection
+- `test_t35_tool.sh` - Automated test script for all injection/extraction methods
+
+## JSON Schemas
+
+### GenericJsonSource Schema
 
 ```json
 {
@@ -24,22 +35,61 @@ This directory contains test files for validating the GenericJsonSource implemen
 }
 ```
 
+### SMPTE Folder Source Schema
+
+SMPTE folder source uses individual JSON files per metadata item with SMPTE ST 2094-50 specific fields:
+
+```json
+{
+  "hdrReferenceWhite": 203,
+  "frame_start": 1,
+  "frame_duration": 1
+}
+```
+
 ## Testing
 
-Test the GenericJsonSource with the CLI:
+### Test GenericJsonSource
 
 ```bash
 cd mybuild
-../bin/t35_tool --verbose 3 inject input.mp4 output.mp4 \
+../bin/t35_tool inject input.mp4 output.mp4 \
   --source generic-json:../IsoLib/t35_tool/test_data/test_manifest.json \
   --method mebx-it35 \
   --t35-prefix B500900001:SMPTE-ST2094-50
 ```
 
-Expected output should show:
+Expected output:
 - Validation passes
 - 3 metadata items loaded
 - Each item has frame_start, frame_duration, and payload_size=16
+
+### Test SMPTE Folder Source
+
+Run the automated test script from the test_data directory:
+
+```bash
+cd IsoLib/t35_tool/test_data
+../../bin/t35_tool inject ST2094-50_LightDetector.mov output.mov \
+  --source smpte-folder:./ExampleJson \
+  --method mebx-it35 \
+  --t35-prefix B500900001:SMPTE-ST2094-50
+```
+
+Or use the comprehensive test script:
+
+```bash
+cd IsoLib/t35_tool/test_data
+./test_t35_tool.sh
+```
+
+The test script validates all injection methods:
+- **ME4C** (default): MEBX track with me4c namespace
+- **Dedicated Track**: Dedicated IT35 metadata track
+- **MEBX IT35**: MEBX track with it35 namespace
+- **Sample Group**: Video track sample groups (sgpd/sbgp)
+
+Each test performs injection followed by extraction using auto-detection.
 
 ## Binary File Contents
 

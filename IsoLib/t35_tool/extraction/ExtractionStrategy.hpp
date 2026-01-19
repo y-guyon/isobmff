@@ -58,14 +58,18 @@ public:
      * Extract metadata from movie
      *
      * @param config Configuration (movie, output path, prefix, etc.)
+     * @param outItems Optional output parameter for in-memory extraction.
+     *                 If non-null, metadata is returned in this map instead of writing files.
+     *                 If null (default), writes files to config.outputPath as before.
      * @return MP4Err (0 = success)
      * @throws T35Exception on error
      *
-     * Output format depends on strategy:
-     * - Binary extractors: Write .bin files + manifest.json
-     * - SEI extractor: Write .hevc/.264 video file
+     * Output format depends on strategy and outItems parameter:
+     * - If outItems == nullptr: Write .bin files + manifest.json (original behavior)
+     * - If outItems != nullptr: Populate MetadataMap with in-memory data
+     * - SEI extractor: Always writes .hevc/.265 video file (ignores outItems)
      */
-    virtual MP4Err extract(const ExtractionConfig& config) = 0;
+    virtual MP4Err extract(const ExtractionConfig& config, MetadataMap* outItems = nullptr) = 0;
 };
 
 /**

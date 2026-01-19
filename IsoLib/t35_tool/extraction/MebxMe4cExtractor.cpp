@@ -291,10 +291,14 @@ bool MebxMe4cExtractor::canExtract(const ExtractionConfig& config,
     return true;
 }
 
-MP4Err MebxMe4cExtractor::extract(const ExtractionConfig& config) {
+MP4Err MebxMe4cExtractor::extract(const ExtractionConfig& config, MetadataMap* outItems) {
     LOG_INFO("Extracting metadata using mebx-me4c extractor");
     LOG_INFO("T.35 prefix: {}", config.t35Prefix);
-    LOG_INFO("Output path: {}", config.outputPath);
+    if (!outItems) {
+        LOG_INFO("Output path: {}", config.outputPath);
+    } else {
+        LOG_INFO("Output mode: in-memory");
+    }
 
     MP4Err err = MP4NoErr;
     MP4TrackReader mebxReader = nullptr;

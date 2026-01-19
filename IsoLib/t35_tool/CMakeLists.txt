@@ -97,6 +97,7 @@ add_executable(
   extraction/DedicatedIt35Extractor.cpp
   extraction/SampleGroupExtractor.cpp
   extraction/AutoExtractor.cpp
+  extraction/SeiExtractor.cpp
 )
 
 target_link_libraries(

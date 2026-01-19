@@ -84,10 +84,14 @@ bool SampleGroupExtractor::canExtract(const ExtractionConfig& config,
     return true;
 }
 
-MP4Err SampleGroupExtractor::extract(const ExtractionConfig& config) {
+MP4Err SampleGroupExtractor::extract(const ExtractionConfig& config, MetadataMap* outItems) {
     LOG_INFO("Extracting metadata using sample-group extractor");
     LOG_INFO("T.35 prefix: {}", config.t35Prefix);
-    LOG_INFO("Output path: {}", config.outputPath);
+    if (!outItems) {
+        LOG_INFO("Output path: {}", config.outputPath);
+    } else {
+        LOG_INFO("Output mode: in-memory");
+    }
 
     MP4Err err = MP4NoErr;
 
@@ -138,20 +142,22 @@ MP4Err SampleGroupExtractor::extract(const ExtractionConfig& config) {
     }
     LOG_INFO("Found {} it35 sample group description(s)", it35_sg_cnt);
 
-    // Create output directory
+    // Prepare output directory if writing to files
     namespace fs = std::filesystem;
-    fs::path outDir(config.outputPath);
-
-    if (!fs::exists(outDir)) {
-        if (!fs::create_directories(outDir)) {
-            LOG_ERROR("Failed to create output directory: {}", config.outputPath);
-            return MP4IOErr;
+    fs::path outDir;
+    if (!outItems) {
+        outDir = config.outputPath;
+        if (!fs::exists(outDir)) {
+            if (!fs::create_directories(outDir)) {
+                LOG_ERROR("Failed to create output directory: {}", config.outputPath);
+                return MP4IOErr;
+            }
         }
+        LOG_INFO("Extracting samples to {}", outDir.string());
     }
 
-    LOG_INFO("Extracting samples to {}", outDir.string());
-
-    // Extract each group description
+    // Extract each group description into memory first
+    MetadataMap items;
     std::vector<nlohmann::json> manifestItems;
 
     for (u32 groupIdx = 1; groupIdx <= it35_sg_cnt; ++groupIdx) {
@@ -190,27 +196,15 @@ MP4Err SampleGroupExtractor::extract(const ExtractionConfig& config) {
         u32 payloadSize = descSize - 1;
         const u8* payloadData = ((u8*)*entryH) + 1;
 
-        // Write binary file
-        fs::path binFile = outDir / ("metadata_" + std::to_string(groupIdx) + ".bin");
-        std::ofstream out(binFile, std::ios::binary);
-        if (!out) {
-            LOG_ERROR("Failed to open {} for writing", binFile.string());
-            MP4DisposeHandle(entryH);
-            return MP4IOErr;
-        }
-
-        out.write((const char*)payloadData, payloadSize);
-        out.close();
+        // Copy payload to memory
+        std::vector<uint8_t> payload(payloadData, payloadData + payloadSize);
 
         // Decode the metadata if they are SMPTE ST 2094-50
         if (config.t35Prefix == "B500900001:SMPTE-ST2094-50") {
             SMPTE_ST2094_50 st2094_50;
-            std::vector<uint8_t> binaryData(payloadSize);
-            std::memcpy(binaryData.data(), &payloadData, payloadSize);
-            
-            st2094_50.decodeBinaryToSyntaxElements(binaryData);
+            st2094_50.decodeBinaryToSyntaxElements(payload);
             st2094_50.convertSyntaxElementsToMetadataItems();
-            st2094_50.dbgPrintMetadataItems(true);  // Print decoded metadata from bitstream
+            st2094_50.dbgPrintMetadataItems(true);
         }
 
         LOG_INFO("Extracted group {}: {} bytes (complete_message={})",
@@ -225,51 +219,83 @@ MP4Err SampleGroupExtractor::extract(const ExtractionConfig& config) {
         if (err == MP4NoErr && samplesInGroup > 0) {
             LOG_DEBUG("Group {} is used by {} sample(s)", groupIdx, samplesInGroup);
 
-            // For manifest, we'll use the first sample as frame_start
-            // and the count as frame_duration (simplified)
+            // For metadata map, use the first sample as frame_start
             u32 frameStart = sampleNumbers[0] - 1; // Convert to 0-based
             u32 frameDuration = samplesInGroup;
 
-            nlohmann::json item;
-            item["frame_start"] = frameStart;
-            item["frame_duration"] = frameDuration;
-            item["binary_file"] = binFile.filename().string();
-            item["sample_size"] = payloadSize;
-            item["group_index"] = groupIdx;
-            item["complete_message"] = completeMessage;
-            item["samples_in_group"] = samplesInGroup;
+            // Create metadata item
+            std::string sourceInfo = "metadata_" + std::to_string(groupIdx) + ".bin";
+            MetadataItem item(frameStart, frameDuration, std::move(payload), sourceInfo);
+            items[frameStart] = item;
 
-            // Include sample numbers for reference
-            nlohmann::json samplesArray = nlohmann::json::array();
-            for (u32 i = 0; i < samplesInGroup; ++i) {
-                samplesArray.push_back(sampleNumbers[i]);
+            // Build manifest item for file output
+            if (!outItems) {
+                nlohmann::json manifestItem;
+                manifestItem["frame_start"] = frameStart;
+                manifestItem["frame_duration"] = frameDuration;
+                manifestItem["binary_file"] = sourceInfo;
+                manifestItem["sample_size"] = payloadSize;
+                manifestItem["group_index"] = groupIdx;
+                manifestItem["complete_message"] = completeMessage;
+                manifestItem["samples_in_group"] = samplesInGroup;
+
+                // Include sample numbers for reference
+                nlohmann::json samplesArray = nlohmann::json::array();
+                for (u32 i = 0; i < samplesInGroup; ++i) {
+                    samplesArray.push_back(sampleNumbers[i]);
+                }
+                manifestItem["sample_numbers"] = samplesArray;
+
+                manifestItems.push_back(manifestItem);
             }
-            item["sample_numbers"] = samplesArray;
-
-            manifestItems.push_back(item);
 
             free(sampleNumbers);
         } else {
             LOG_WARN("Group {} has no samples mapped (err={})", groupIdx, err);
 
-            // Still add to manifest but mark as unused
-            nlohmann::json item;
-            item["frame_start"] = 0;
-            item["frame_duration"] = 0;
-            item["binary_file"] = binFile.filename().string();
-            item["sample_size"] = payloadSize;
-            item["group_index"] = groupIdx;
-            item["complete_message"] = completeMessage;
-            item["samples_in_group"] = 0;
-            item["sample_numbers"] = nlohmann::json::array();
+            // Still add to items but with zero duration
+            std::string sourceInfo = "metadata_" + std::to_string(groupIdx) + ".bin";
+            MetadataItem item(0, 0, std::move(payload), sourceInfo);
+            items[0] = item;
 
-            manifestItems.push_back(item);
+            // Build manifest item for file output
+            if (!outItems) {
+                nlohmann::json manifestItem;
+                manifestItem["frame_start"] = 0;
+                manifestItem["frame_duration"] = 0;
+                manifestItem["binary_file"] = sourceInfo;
+                manifestItem["sample_size"] = payloadSize;
+                manifestItem["group_index"] = groupIdx;
+                manifestItem["complete_message"] = completeMessage;
+                manifestItem["samples_in_group"] = 0;
+                manifestItem["sample_numbers"] = nlohmann::json::array();
+
+                manifestItems.push_back(manifestItem);
+            }
         }
 
         MP4DisposeHandle(entryH);
     }
 
     LOG_INFO("Extracted {} it35 group descriptions", it35_sg_cnt);
+
+    // If in-memory mode, return items
+    if (outItems) {
+        *outItems = std::move(items);
+        return MP4NoErr;
+    }
+
+    // Otherwise write files
+    for (const auto& [frameStart, item] : items) {
+        fs::path binFile = outDir / item.source_info;
+        std::ofstream out(binFile, std::ios::binary);
+        if (!out) {
+            LOG_ERROR("Failed to open {} for writing", binFile.string());
+            return MP4IOErr;
+        }
+        out.write((const char*)item.payload.data(), item.payload.size());
+        out.close();
+    }
 
     // Write manifest JSON
     if (!manifestItems.empty()) {

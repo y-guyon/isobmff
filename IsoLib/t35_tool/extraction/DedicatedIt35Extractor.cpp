@@ -159,10 +159,14 @@ bool DedicatedIt35Extractor::canExtract(const ExtractionConfig& config,
     return true;
 }
 
-MP4Err DedicatedIt35Extractor::extract(const ExtractionConfig& config) {
+MP4Err DedicatedIt35Extractor::extract(const ExtractionConfig& config, MetadataMap* outItems) {
     LOG_INFO("Extracting metadata using dedicated-it35 extractor");
     LOG_INFO("T.35 prefix: {}", config.t35Prefix);
-    LOG_INFO("Output path: {}", config.outputPath);
+    if (!outItems) {
+        LOG_INFO("Output path: {}", config.outputPath);
+    } else {
+        LOG_INFO("Output mode: in-memory");
+    }
 
     MP4Err err = MP4NoErr;
     MP4Track it35Track = nullptr;

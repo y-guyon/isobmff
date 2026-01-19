@@ -4,6 +4,7 @@
 #include "DedicatedIt35Extractor.hpp"
 #include "AutoExtractor.hpp"
 #include "SampleGroupExtractor.hpp"
+#include "SeiExtractor.hpp"
 #include "../common/Logger.hpp"
 
 namespace t35 {
@@ -22,8 +23,7 @@ std::unique_ptr<ExtractionStrategy> createExtractionStrategy(const std::string& 
     } else if (strategyName == "sample-group") {
         return std::make_unique<SampleGroupExtractor>();
     } else if (strategyName == "sei") {
-        throw T35Exception(T35Error::NotImplemented,
-                          "Extraction strategy '" + strategyName + "' is not yet implemented");
+        return std::make_unique<SeiExtractor>();
     } else {
         throw T35Exception(T35Error::ExtractionFailed,
                           "Unknown extraction strategy: " + strategyName);

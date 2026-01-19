@@ -171,10 +171,14 @@ bool MebxIt35Extractor::canExtract(const ExtractionConfig& config,
     return true;
 }
 
-MP4Err MebxIt35Extractor::extract(const ExtractionConfig& config) {
+MP4Err MebxIt35Extractor::extract(const ExtractionConfig& config, MetadataMap* outItems) {
     LOG_INFO("Extracting metadata using mebx-it35 extractor");
     LOG_INFO("T.35 prefix: {}", config.t35Prefix);
-    LOG_INFO("Output path: {}", config.outputPath);
+    if (!outItems) {
+        LOG_INFO("Output path: {}", config.outputPath);
+    } else {
+        LOG_INFO("Output mode: in-memory");
+    }
 
     MP4Err err = MP4NoErr;
     MP4TrackReader mebxReader = nullptr;
@@ -208,27 +212,28 @@ MP4Err MebxIt35Extractor::extract(const ExtractionConfig& config) {
     }
     LOG_DEBUG("Mebx track timescale: {}", timescale);
 
-    // Create output directory
+    // Prepare output directory if writing to files
     namespace fs = std::filesystem;
-    fs::path outDir(config.outputPath);
-
-    if (!fs::exists(outDir)) {
-        if (!fs::create_directories(outDir)) {
-            LOG_ERROR("Failed to create output directory: {}", config.outputPath);
-            MP4DisposeTrackReader(mebxReader);
-            return MP4IOErr;
+    fs::path outDir;
+    if (!outItems) {
+        outDir = config.outputPath;
+        if (!fs::exists(outDir)) {
+            if (!fs::create_directories(outDir)) {
+                LOG_ERROR("Failed to create output directory: {}", config.outputPath);
+                MP4DisposeTrackReader(mebxReader);
+                return MP4IOErr;
+            }
         }
+        LOG_INFO("Extracting samples to {}", outDir.string());
     }
 
-    LOG_INFO("Extracting samples to {}", outDir.string());
-
-    // Extract all samples
+    // Extract all samples into memory first
+    MetadataMap items;
     std::vector<nlohmann::json> manifestItems;
     u32 sampleCount = 0;
     u32 currentFrame = 0;
 
-    for (u32 i = 1; i <= sampleCount; ++i) {
-        LOG_INFO("Test2");
+    while (true) {
         MP4Handle sampleH = nullptr;
         u32 sampleSize = 0, sampleFlags = 0, sampleDuration = 0;
         s32 dts = 0, cts = 0;
@@ -263,50 +268,42 @@ MP4Err MebxIt35Extractor::extract(const ExtractionConfig& config) {
         sampleCount++;
 
         // Calculate frame duration (assuming constant frame rate)
-        // For now, we'll use 1 frame per timescale unit, can be refined
         u32 frameDuration = 1;
         if (sampleDuration > 0) {
-            // This is a simplification - in reality we'd need video track info
             frameDuration = sampleDuration / 512; // rough estimate
             if (frameDuration == 0) frameDuration = 1;
         }
 
-        // Write binary file
-        fs::path binFile = outDir / ("metadata_" + std::to_string(i) + ".bin");
-        std::ofstream out(binFile, std::ios::binary);
-        if (!out) {
-            LOG_ERROR("Failed to open {} for writing", binFile.string());
-            MP4DisposeHandle(sampleH);
-            MP4DisposeTrackReader(mebxReader);
-            return MP4IOErr;
-        }
+        // Copy payload to memory
+        std::vector<uint8_t> payload((uint8_t*)*sampleH, (uint8_t*)*sampleH + sampleSize);
 
-        // Decode the metadata if they are SMPTE ST 2094-50
+        // Decode if SMPTE ST 2094-50
         if (config.t35Prefix == "B500900001:SMPTE-ST2094-50") {
             SMPTE_ST2094_50 st2094_50;
-            std::vector<uint8_t> binaryData(sampleSize);
-            std::memcpy(binaryData.data(), *sampleH, sampleSize);
-            
-            st2094_50.decodeBinaryToSyntaxElements(binaryData);
+            st2094_50.decodeBinaryToSyntaxElements(payload);
             st2094_50.convertSyntaxElementsToMetadataItems();
-            st2094_50.dbgPrintMetadataItems(true);  // Print decoded metadata from bitstream
+            st2094_50.dbgPrintMetadataItems(true);
         }
 
-        out.write((char*)*sampleH, sampleSize);
-        out.close();
-
         LOG_INFO("Extracted sample {}: {} bytes, DTS={}, duration={} (frame {})",
-                i, sampleSize, dts, sampleDuration, currentFrame);
+                sampleCount, sampleSize, dts, sampleDuration, currentFrame);
 
-        // Add to manifest
-        nlohmann::json item;
-        item["frame_start"] = currentFrame;
-        item["frame_duration"] = frameDuration;
-        item["binary_file"] = binFile.filename().string();
-        item["sample_size"] = sampleSize;
-        item["dts"] = dts;
-        item["duration_timescale"] = sampleDuration;
-        manifestItems.push_back(item);
+        // Create metadata item
+        std::string sourceInfo = "metadata_" + std::to_string(sampleCount) + ".bin";
+        MetadataItem item(currentFrame, frameDuration, std::move(payload), sourceInfo);
+        items[currentFrame] = item;
+
+        // Build manifest item for file output
+        if (!outItems) {
+            nlohmann::json manifestItem;
+            manifestItem["frame_start"] = currentFrame;
+            manifestItem["frame_duration"] = frameDuration;
+            manifestItem["binary_file"] = sourceInfo;
+            manifestItem["sample_size"] = sampleSize;
+            manifestItem["dts"] = dts;
+            manifestItem["duration_timescale"] = sampleDuration;
+            manifestItems.push_back(manifestItem);
+        }
 
         currentFrame += frameDuration;
 
@@ -316,6 +313,24 @@ MP4Err MebxIt35Extractor::extract(const ExtractionConfig& config) {
     MP4DisposeTrackReader(mebxReader);
 
     LOG_INFO("Extracted {} metadata samples", sampleCount);
+
+    // If in-memory mode, return items
+    if (outItems) {
+        *outItems = std::move(items);
+        return MP4NoErr;
+    }
+
+    // Otherwise write files
+    for (const auto& [frameStart, item] : items) {
+        fs::path binFile = outDir / item.source_info;
+        std::ofstream out(binFile, std::ios::binary);
+        if (!out) {
+            LOG_ERROR("Failed to open {} for writing", binFile.string());
+            return MP4IOErr;
+        }
+        out.write((const char*)item.payload.data(), item.payload.size());
+        out.close();
+    }
 
     // Write manifest JSON
     if (!manifestItems.empty()) {
