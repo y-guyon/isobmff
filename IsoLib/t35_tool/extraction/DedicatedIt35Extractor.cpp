@@ -271,7 +271,7 @@ MP4Err DedicatedIt35Extractor::extract(const ExtractionConfig& config, MetadataM
             
             st2094_50.decodeBinaryToSyntaxElements(binaryData);
             st2094_50.convertSyntaxElementsToMetadataItems();
-            st2094_50.dbgPrintMetadataItems(true);  // Print decoded metadata from bitstream
+            st2094_50.dbgPrintMetadataItems();  // Print decoded metadata from bitstream
         }
 
         // Write binary file
@@ -291,7 +291,7 @@ MP4Err DedicatedIt35Extractor::extract(const ExtractionConfig& config, MetadataM
             
             st2094_50.decodeBinaryToSyntaxElements(binaryData);
             st2094_50.convertSyntaxElementsToMetadataItems();
-            st2094_50.dbgPrintMetadataItems(true);  // Print decoded metadata from bitstream
+            st2094_50.dbgPrintMetadataItems();  // Print decoded metadata from bitstream
         }
         
         // Samples are raw payloads (no box wrapper)
