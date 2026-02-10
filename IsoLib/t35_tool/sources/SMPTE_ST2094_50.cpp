@@ -3,6 +3,8 @@
 #include "SMPTE_ST2094_50.hpp"
 #include <cstdarg>
 #include <cstdio>
+#include <bitset>
+#include <numeric>
 
 /* *********************************** LOCAL LOGGING FUNCTIONS *******************************************************************************************/
 
@@ -496,7 +498,7 @@ bool SMPTE_ST2094_50::decodeJsonToMetadataItems(nlohmann::json j) {
 void SMPTE_ST2094_50::convertMetadataItemsToSyntaxElements(){
   elm.has_custom_hdr_reference_white_flag = false;
   elm.has_adaptive_tone_map_flag = false;
-  if (abs(cvt.hdrReferenceWhite - 203.0) > (0.5f * Q_HDR_REFERENCE_WHITE)) {
+  if (std::abs(cvt.hdrReferenceWhite - 203.0) > (0.5f * Q_HDR_REFERENCE_WHITE)) {
     elm.has_custom_hdr_reference_white_flag = true;
     elm.hdr_reference_white = uint16_t(cvt.hdrReferenceWhite * Q_HDR_REFERENCE_WHITE);
   }

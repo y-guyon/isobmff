@@ -41,17 +41,35 @@ cmake ..
 make
 ```
 
-#### ⚙️ Optional CMake Configuration Flags
+#### ⚙️ CMake Configuration Options
 
 | Option                            | Default | Description                                                                 |
 |-----------------------------------|---------|-----------------------------------------------------------------------------|
+| `ISOBMFF_BUILD_LIB_ONLY`          | `OFF`   | Build only `libisomediafile` (skips tools, tests, and submodule dependencies). Ideal for integrating the library into other projects. |
+| `SET_CUSTOM_OUTPUT_DIRS`          | `OFF`   | Places output binaries in `<source>/bin/` and libraries in `<source>/lib/`. By default, artifacts go to the build directory. |
 | `LIBISOMEDIAFILE_STRICT_WARNINGS` | `ON`    | Treats all compiler warnings as errors. Set to `OFF` to disable.            |
-| `SET_CUSTOM_OUTPUT_DIRS`          | `ON`    | Places output binaries in `bin/` and libraries in `lib/`. Set to `OFF` to allow custom build layout. |
+| `GIT_SUBMODULE`                   | `ON`    | Automatically update git submodules during configuration (requires git).     |
 
-Example:
+**Example - Standalone build with custom output locations:**
 
 ```sh
-cmake -DLIBISOMEDIAFILE_STRICT_WARNINGS=OFF -DSET_CUSTOM_OUTPUT_DIRS=OFF -DCMAKE_BUILD_TYPE=Debug ..
+cmake -DSET_CUSTOM_OUTPUT_DIRS=ON ..
+make
+# Outputs: bin/hevc_muxer, lib/liblibisomediafile.a, etc.
+```
+
+**Example - Library-only integration (no submodules needed):**
+
+```sh
+cmake -DISOBMFF_BUILD_LIB_ONLY=ON ..
+make
+# Builds only libisomediafile, skips HEVC/DRC tools and dependencies
+```
+
+**Example - Relaxed build for integration:**
+
+```sh
+cmake -DLIBISOMEDIAFILE_STRICT_WARNINGS=OFF -DISOBMFF_BUILD_LIB_ONLY=ON ..
 ```
 
 ### Cross-Platform Support
