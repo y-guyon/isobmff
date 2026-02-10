@@ -13,12 +13,6 @@ echo "*********************************************  DEDICATED TRACK ***********
 
 echo ""
 echo ""
-echo "*********************************************  MEBX *********************************************"
-./t35_tool inject ST2094-50_LightDetector.mov ST2094-50_LightDetector_mebx.mov --source smpte-folder:./ExampleJson --method mebx-it35 --t35-prefix B500900001:SMPTE-ST2094-50
-./t35_tool extract ST2094-50_LightDetector_mebx.mov ./output_folder --method auto --t35-prefix B500900001:SMPTE-ST2094-50
-
-echo ""
-echo ""
 echo "*********************************************  SAMPLE GROUP *********************************************"
 ./t35_tool inject ST2094-50_LightDetector.mov ST2094-50_LightDetector_sampleGroup.mov --source smpte-folder:./ExampleJson --method sample-group
 ./t35_tool extract ST2094-50_LightDetector_sampleGroup.mov ./output_folder --method auto --t35-prefix B500900001:SMPTE-ST2094-50

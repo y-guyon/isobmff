@@ -87,12 +87,10 @@ add_executable(
   sources/GenericJsonSource.cpp
   sources/SMPTEFolderSource.cpp
   injection/InjectionStrategy.cpp
-  injection/MebxIt35Strategy.cpp
   injection/MebxMe4cStrategy.cpp
   injection/DedicatedIt35Strategy.cpp
   injection/SampleGroupStrategy.cpp
   extraction/ExtractionStrategy.cpp
-  extraction/MebxIt35Extractor.cpp
   extraction/MebxMe4cExtractor.cpp
   extraction/DedicatedIt35Extractor.cpp
   extraction/SampleGroupExtractor.cpp

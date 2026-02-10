@@ -1,5 +1,4 @@
 #include "InjectionStrategy.hpp"
-#include "MebxIt35Strategy.hpp"
 #include "MebxMe4cStrategy.hpp"
 #include "DedicatedIt35Strategy.hpp"
 #include "SampleGroupStrategy.hpp"
@@ -10,9 +9,7 @@ namespace t35 {
 std::unique_ptr<InjectionStrategy> createInjectionStrategy(const std::string& strategyName) {
     LOG_DEBUG("Creating injection strategy: '{}'", strategyName);
 
-    if (strategyName == "mebx-it35") {
-        return std::make_unique<MebxIt35Strategy>();
-    } else if (strategyName == "mebx-me4c") {
+    if (strategyName == "mebx-me4c") {
         return std::make_unique<MebxMe4cStrategy>();
     } else if (strategyName == "dedicated-it35") {
         return std::make_unique<DedicatedIt35Strategy>();

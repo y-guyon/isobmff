@@ -97,7 +97,6 @@ t35_tool inject [OPTIONS] input output
 
 - `--method, -m <method>` - Injection method (default: `mebx-me4c`)
   - `mebx-me4c` - MEBX track with me4c namespace
-  - `mebx-it35` - MEBX track with it35 namespace
   - `dedicated-it35` - Dedicated metadata track
   - `sample-group` - Sample group approach
 
@@ -116,12 +115,6 @@ t35_tool inject input.mp4 output.mp4 \
 t35_tool inject input.mp4 output.mp4 \
   --source smpte-folder:./metadata_folder \
   --method dedicated-it35
-
-# Inject with custom T.35 prefix
-t35_tool inject input.mp4 output.mp4 \
-  --source json-manifest:metadata.json \
-  --method mebx-it35 \
-  --t35-prefix B500900002:CustomMetadata
 
 # Inject using sample groups
 t35_tool inject input.mp4 output.mp4 \
@@ -161,9 +154,9 @@ t35_tool extract [OPTIONS] input output
 # Auto-detect and extract to directory
 t35_tool extract input.mp4 ./output_folder
 
-# Extract specifically from MEBX-it35 track
+# Extract from MEBX-me4c track
 t35_tool extract input.mp4 ./output_folder \
-  --method mebx-it35
+  --method mebx-me4c
 
 # Extract with specific T.35 prefix filter
 t35_tool extract input.mp4 ./output_folder \
@@ -235,13 +228,6 @@ The T.35 prefix identifies the metadata type using ITU-T T.35 country and termin
 - **Use Case**: Standard metadata embedding for compatibility with various players
 - **Container**: MEBX track in MP4
 
-### MEBX with it35 Namespace
-
-- **Identifier**: `mebx-it35`
-- **Description**: Uses the Metadata Extension Box (MEBX) with the 'it35' namespace
-- **Use Case**: T.35-specific metadata embedding with explicit namespace
-- **Container**: MEBX track in MP4
-
 ### Dedicated Metadata Track
 
 - **Identifier**: `dedicated-it35`
@@ -268,7 +254,6 @@ The T.35 prefix identifies the metadata type using ITU-T T.35 country and termin
 
 Specify the exact extraction method when you know the injection method used:
 
-- `mebx-it35` - For MEBX tracks with it35 namespace
 - `mebx-me4c` - For MEBX tracks with me4c namespace
 - `dedicated-it35` - For dedicated metadata tracks
 - `sample-group` - For sample group based metadata

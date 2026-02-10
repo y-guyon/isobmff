@@ -31,7 +31,6 @@ SOURCE_MANIFEST="${TEST_DATA_DIR}/test_manifest.json"
 
 # Injection modes to test
 INJECTION_MODES=(
-    "mebx-it35"
     "mebx-me4c"
     "dedicated-it35"
     "sample-group"

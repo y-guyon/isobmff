@@ -47,13 +47,11 @@ void printAvailableOptions() {
     std::cout << "\n";
     std::cout << "Available injection methods:\n";
     std::cout << "  mebx-me4c                - MEBX track with me4c namespace (default)\n";
-    std::cout << "  mebx-it35                - MEBX track with it35 namespace\n";
     std::cout << "  dedicated-it35           - Dedicated metadata track\n";
     std::cout << "  sample-group             - Sample group\n";
     std::cout << "\n";
     std::cout << "Available extraction methods:\n";
     std::cout << "  auto                     - Auto-detect (default)\n";
-    std::cout << "  mebx-it35                - MEBX with it35 namespace\n";
     std::cout << "  mebx-me4c                - MEBX with me4c namespace\n";
     std::cout << "  dedicated-it35           - Dedicated metadata track\n";
     std::cout << "  sample-group             - Sample group\n";
