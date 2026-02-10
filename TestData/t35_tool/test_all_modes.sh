@@ -45,23 +45,23 @@ find_tool() {
     fi
 
     if [ -z "$tool_path" ] || [ ! -f "$tool_path" ]; then
-        printf "${RED}[ERROR]${NC} t35_tool not found. Please build the project first.\n"
-        printf "  Searched locations:\n"
-        printf "    - ${PROJECT_ROOT}/bin/t35_tool\n"
-        printf "    - ${PROJECT_ROOT}/mybuild/IsoLib/t35_tool/t35_tool\n"
-        printf "    - ${PROJECT_ROOT}/build/IsoLib/t35_tool/t35_tool\n"
-        exit 1
+        printf "${RED}[ERROR]${NC} t35_tool not found. Please build the project first.\n" >&2
+        printf "  Searched locations:\n" >&2
+        printf "    - ${PROJECT_ROOT}/bin/t35_tool\n" >&2
+        printf "    - ${PROJECT_ROOT}/mybuild/IsoLib/t35_tool/t35_tool\n" >&2
+        printf "    - ${PROJECT_ROOT}/build/IsoLib/t35_tool/t35_tool\n" >&2
+        return 1
     fi
 
-    printf "${GREEN}[TOOL]${NC} Using t35_tool from: ${BLUE}%s${NC}\n" "$source"
-    printf "       Path: %s\n\n" "$tool_path"
+    printf "${GREEN}[TOOL]${NC} Using t35_tool from: ${BLUE}%s${NC}\n" "$source" >&2
+    printf "       Path: %s\n\n" "$tool_path" >&2
 
     echo "$tool_path"
 }
 
-TOOL=$(find_tool)
+TOOL=$(find_tool) || exit 1
 INPUT_VIDEO="${PROJECT_ROOT}/TestData/isobmff/01_simple.mp4"
-OUTPUT_DIR="/tmp/t35_test_results"
+OUTPUT_DIR="${TEST_DATA_DIR}/output_all_modes"
 TIMESTAMP=$(date +%Y%m%d_%H%M%S)
 RESULTS_DIR="${OUTPUT_DIR}/${TIMESTAMP}"
 
