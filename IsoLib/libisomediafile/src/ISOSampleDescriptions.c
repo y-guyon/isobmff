@@ -1871,7 +1871,7 @@ ISOAddMebxMetadataToSampleEntry(MP4BoxedMetadataSampleEntryPtr mebx, u32 desired
     if(err) goto bail;
   }
 
-  keytable->addMetaDataKeyBox(keytable, (MP4AtomPtr)keyb);
+  err = keytable->addMetaDataKeyBox(keytable, (MP4AtomPtr)keyb);
   if(err) goto bail;
 
 bail:
