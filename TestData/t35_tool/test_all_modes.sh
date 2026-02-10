@@ -17,9 +17,49 @@ NC='\033[0m' # No Color
 # Configuration
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="${SCRIPT_DIR}/../.."
-BUILD_DIR="${PROJECT_ROOT}/mybuild"
-TOOL="${BUILD_DIR}/../bin/t35_tool"
-TEST_DATA_DIR="${SCRIPT_DIR}/test_data"
+TEST_DATA_DIR="${PROJECT_ROOT}/TestData/t35_tool"
+
+# Find t35_tool executable (priority order: bin/, mybuild/, build/, find)
+find_tool() {
+    local tool_path=""
+    local source=""
+
+    # 1. Check bin/ directory (SET_CUSTOM_OUTPUT_DIRS=ON)
+    if [ -f "${PROJECT_ROOT}/bin/t35_tool" ]; then
+        tool_path="${PROJECT_ROOT}/bin/t35_tool"
+        source="bin/ (custom output dirs)"
+    # 2. Check mybuild/ directory
+    elif [ -f "${PROJECT_ROOT}/mybuild/IsoLib/t35_tool/t35_tool" ]; then
+        tool_path="${PROJECT_ROOT}/mybuild/IsoLib/t35_tool/t35_tool"
+        source="mybuild/ (build directory)"
+    # 3. Check build/ directory
+    elif [ -f "${PROJECT_ROOT}/build/IsoLib/t35_tool/t35_tool" ]; then
+        tool_path="${PROJECT_ROOT}/build/IsoLib/t35_tool/t35_tool"
+        source="build/ (build directory)"
+    # 4. Search for tool
+    else
+        tool_path=$(find "${PROJECT_ROOT}" -name "t35_tool" -type f -executable 2>/dev/null | grep -v legacy | head -1)
+        if [ -n "$tool_path" ]; then
+            source="found at $(dirname "$tool_path")"
+        fi
+    fi
+
+    if [ -z "$tool_path" ] || [ ! -f "$tool_path" ]; then
+        printf "${RED}[ERROR]${NC} t35_tool not found. Please build the project first.\n"
+        printf "  Searched locations:\n"
+        printf "    - ${PROJECT_ROOT}/bin/t35_tool\n"
+        printf "    - ${PROJECT_ROOT}/mybuild/IsoLib/t35_tool/t35_tool\n"
+        printf "    - ${PROJECT_ROOT}/build/IsoLib/t35_tool/t35_tool\n"
+        exit 1
+    fi
+
+    printf "${GREEN}[TOOL]${NC} Using t35_tool from: ${BLUE}%s${NC}\n" "$source"
+    printf "       Path: %s\n\n" "$tool_path"
+
+    echo "$tool_path"
+}
+
+TOOL=$(find_tool)
 INPUT_VIDEO="${PROJECT_ROOT}/TestData/isobmff/01_simple.mp4"
 OUTPUT_DIR="/tmp/t35_test_results"
 TIMESTAMP=$(date +%Y%m%d_%H%M%S)
