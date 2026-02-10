@@ -43,20 +43,22 @@ static MP4Err serialize(struct MP4Atom *s, char *buffer)
   err = MP4SerializeCommonBaseAtomFields(s, buffer);
   if(err) goto bail;
   buffer += self->bytesWritten;
+  /* class SampleEntry */
   PUTBYTES(self->reserved, 6);
   PUT16(dataReferenceIndex);
+
+  /* class VisualSampleEntry */
   PUTBYTES(self->reserved2, 16);
   PUT16(width);
   PUT16(height);
-  /* PUT32( reserved3 ); */
-  PUT32(reserved4);
-  PUT32(reserved5);
+  PUT32(horizresolution);
+  PUT32(vertresolution);
   PUT32(reserved6);
-  PUT16(reserved7);
+  PUT16(frame_count);
   PUT8(nameLength);
-  PUTBYTES(self->name31, 31);
-  PUT16(reserved8);
-  PUT16(reserved9);
+  PUTBYTES(self->compressorname31, 31);
+  PUT16(depth);
+  PUT16(pre_defined2);
   SERIALIZE_ATOM_LIST(ExtensionAtomList);
   assert(self->bytesWritten == self->size);
 bail:
@@ -91,20 +93,22 @@ static MP4Err createFromInputStream(MP4AtomPtr s, MP4AtomPtr proto, MP4InputStre
   err = self->super->createFromInputStream(s, proto, (char *)inputStream);
   if(err) goto bail;
 
+  /* class SampleEntry */
   GETBYTES(6, reserved);
   GET16(dataReferenceIndex);
+
+  /* class VisualSampleEntry */
   GETBYTES(16, reserved2);
   GET16(width);
   GET16(height);
-  /* GET32( reserved3 ); */
-  GET32(reserved4);
-  GET32(reserved5);
+  GET32(horizresolution);
+  GET32(vertresolution);
   GET32(reserved6);
-  GET16(reserved7);
+  GET16(frame_count);
   GET8(nameLength);
-  GETBYTES(31, name31);
-  GET16(reserved8);
-  GET16(reserved9);
+  GETBYTES(31, compressorname31);
+  GET16(depth);
+  GET16(pre_defined2);
   GETATOM_LIST(ExtensionAtomList);
 
 bail:
@@ -132,17 +136,16 @@ MP4Err MP4CreateVisualSampleEntryAtom(MP4VisualSampleEntryAtomPtr *outAtom)
   self->calculateSize         = calculateSize;
   self->serialize             = serialize;
 
-  self->width     = 0x140;
-  self->height    = 0xf0;
-  self->reserved4 = 0x00480000;
-  self->reserved5 = 0x00480000;
-  self->reserved7 = 1;
-  self->reserved8 = 0x18;
-  self->reserved9 = -1;
+  self->width           = 0x140;
+  self->height          = 0xf0;
+  self->horizresolution = 0x00480000;
+  self->vertresolution  = 0x00480000;
+  self->frame_count     = 1;
+  self->depth           = 0x18;
+  self->pre_defined2    = -1;
 
   *outAtom = self;
 bail:
   TEST_RETURN(err);
-
   return err;
 }

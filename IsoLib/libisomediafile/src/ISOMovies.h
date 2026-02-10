@@ -697,6 +697,16 @@ extern "C"
   ISO_EXTERN(ISOErr)
   ISOGetHEVCSampleDescriptionPS(MP4Handle sampleEntryH, MP4Handle ps, u32 where, u32 index);
   /**
+   * @brief Gets all NAL Units from the HEVC sample entry in Annex B format
+   * @ingroup SampleDescr
+   *
+   * @param sampleEntryH input sample entry handle
+   * @param nalus output handle which is holding all the NAL Units in Annex B fromat
+   * @param extraction_mode if set to 0 - get them all; 1 - hvcC only; 2 - lhvC only
+   */
+  ISO_EXTERN(ISOErr)
+  ISOGetHEVCNALUs(MP4Handle sampleEntryH, MP4Handle nalus, u32 extraction_mode);
+  /**
    * @brief Gets a restricted video parameter set (AVC or HEVC), placing it in the given handle
    * @ingroup SampleDescr
    *
@@ -715,9 +725,8 @@ extern "C"
   /**
    * @brief Get the four character code of the original un-transformed sample entry
    * @ingroup SampleDescr
-   * @todo rename the function to ISOGetOriginalFormat and parse the cinf and sinf as well
    */
-  ISO_EXTERN(ISOErr) ISOGetRESVOriginalFormat(MP4Handle sampleEntryH, u32 *outOrigFmt);
+  ISO_EXTERN(ISOErr) ISOGetOriginalFormat(MP4Handle sampleEntryH, u32 *outOrigFmt);
   /**
    * @brief Get scheme_type and scheme_version from the SchemeTypeBox in resv
    * @ingroup SampleDescr

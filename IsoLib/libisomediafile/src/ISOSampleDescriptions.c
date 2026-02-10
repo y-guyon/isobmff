@@ -1199,6 +1199,88 @@ bail:
 }
 
 MP4_EXTERN(MP4Err)
+ISOGetHEVCNALUs(MP4Handle sampleEntryH, MP4Handle nalus, u32 extraction_mode)
+{
+  MP4Err err                        = MP4NoErr;
+  MP4VisualSampleEntryAtomPtr entry = NULL;
+  ISOHEVCConfigAtomPtr hvcC         = NULL;
+  ISOLHEVCConfigAtomPtr lhvC        = NULL;
+
+  static const u8 annexB_prefix[] = {0x00, 0x00, 0x00, 0x01};
+
+  err = sampleEntryHToAtomPtr(sampleEntryH, (MP4AtomPtr *)&entry, MP4VisualSampleEntryAtomType);
+  if(err) goto bail;
+
+  if(entry->type == MP4EncVisualSampleEntryAtomType ||
+     entry->type == MP4RestrictedVideoSampleEntryAtomType)
+  {
+    u32 origFmt = 0;
+    err         = ISOGetOriginalFormat(sampleEntryH, &origFmt);
+    if(origFmt != ISOHEVCSampleEntryAtomType && origFmt != ISOLHEVCSampleEntryAtomType)
+      BAILWITHERROR(MP4BadParamErr);
+  }
+  else if(entry->type != ISOHEVCSampleEntryAtomType && entry->type != ISOLHEVCSampleEntryAtomType)
+    BAILWITHERROR(MP4BadParamErr);
+
+  MP4GetListEntryAtom(entry->ExtensionAtomList, ISOHEVCConfigAtomType, (MP4AtomPtr *)&hvcC);
+  MP4GetListEntryAtom(entry->ExtensionAtomList, ISOLHEVCConfigAtomType, (MP4AtomPtr *)&lhvC);
+
+  u32 i, j;
+
+#define DUMP_NAL_UNITS(cfgAtom)                                           \
+  for(i = 0; i <= 8; i++)                                                 \
+  {                                                                       \
+    if(cfgAtom->arrays[i].nalList)                                        \
+    {                                                                     \
+      u32 count = 0;                                                      \
+      MP4GetListEntryCount(cfgAtom->arrays[i].nalList, &count);           \
+      if(count == 0) continue;                                            \
+      for(j = 0; j < count; j++)                                          \
+      {                                                                   \
+        MP4Handle oneNAL = NULL;                                          \
+        u32 nalSize      = 0;                                             \
+        MP4GetListEntry(cfgAtom->arrays[i].nalList, j, (char **)&oneNAL); \
+        MP4GetHandleSize(oneNAL, &nalSize);                               \
+        MP4Handle prefixH = NULL;                                         \
+        MP4NewHandle(sizeof(annexB_prefix), &prefixH);                    \
+        memcpy(*prefixH, annexB_prefix, sizeof(annexB_prefix));           \
+        MP4HandleCat(nalus, prefixH);                                     \
+        MP4HandleCat(nalus, oneNAL);                                      \
+        MP4DisposeHandle(prefixH);                                        \
+      }                                                                   \
+    }                                                                     \
+  }
+
+  switch(extraction_mode)
+  {
+  case 0: /* All */
+    if(hvcC == NULL && lhvC == NULL) BAILWITHERROR(MP4BadDataErr);
+    if(hvcC) DUMP_NAL_UNITS(hvcC);
+    if(lhvC) DUMP_NAL_UNITS(lhvC);
+    break;
+
+  case 1: /* hvcC only */
+    if(hvcC == NULL) BAILWITHERROR(MP4BadDataErr);
+    DUMP_NAL_UNITS(hvcC);
+    break;
+
+  case 2: /* lhvC only */
+    if(lhvC == NULL) BAILWITHERROR(MP4BadDataErr);
+    DUMP_NAL_UNITS(lhvC);
+    break;
+
+  default:
+    BAILWITHERROR(MP4BadParamErr);
+    break;
+  }
+
+#undef DUMP_NAL_UNITS
+bail:
+  if(entry) entry->destroy((MP4AtomPtr)entry);
+  return err;
+}
+
+MP4_EXTERN(MP4Err)
 ISOAddVVCSampleDescriptionPS(MP4Handle sampleEntryH, MP4Handle ps, u32 where)
 {
   MP4Err err = MP4NoErr;
@@ -1391,33 +1473,47 @@ bail:
   return err;
 }
 
-MP4_EXTERN(MP4Err) ISOGetRESVOriginalFormat(MP4Handle sampleEntryH, u32 *outOrigFmt)
+MP4_EXTERN(MP4Err) ISOGetOriginalFormat(MP4Handle sampleEntryH, u32 *outOrigFmt)
 {
-  MP4Err err = MP4NoErr;
-  MP4RestrictedVideoSampleEntryAtomPtr entry =
-    NULL; /* MP4RestrictedVideoSampleEntryAtomPtr | MP4VisualSampleEntryAtomPtr */
-  MP4RestrictedSchemeInfoAtomPtr rinf;
+  MP4Err err       = MP4NoErr;
+  MP4AtomPtr entry = NULL;
   MP4OriginalFormatAtomPtr fmt;
 
-  err = sampleEntryHToAtomPtr(sampleEntryH, (MP4AtomPtr *)&entry, MP4VisualSampleEntryAtomType);
+  err = sampleEntryHToAtomPtr(sampleEntryH, &entry, MP4VisualSampleEntryAtomType);
   if(err) goto bail;
 
-  if(entry->type != MP4RestrictedVideoSampleEntryAtomType) BAILWITHERROR(MP4BadParamErr);
-
-  err = entry->getRinf((MP4AtomPtr)entry, (MP4AtomPtr *)&rinf);
-  if(err) goto bail;
-  if(!rinf)
+  switch(entry->type)
   {
+  case MP4RestrictedVideoSampleEntryAtomType:
+  {
+    MP4RestrictedSchemeInfoAtomPtr rinf       = NULL;
+    MP4RestrictedVideoSampleEntryAtomPtr resv = (MP4RestrictedVideoSampleEntryAtomPtr)entry;
+
+    err = resv->getRinf((MP4AtomPtr)resv, (MP4AtomPtr *)&rinf);
+    if(err || !rinf) BAILWITHERROR(MP4BadParamErr);
+
+    fmt = (MP4OriginalFormatAtomPtr)rinf->MP4OriginalFormat;
+    break;
+  }
+
+  case MP4EncVisualSampleEntryAtomType:
+  {
+    MP4EncVisualSampleEntryAtomPtr encv = (MP4EncVisualSampleEntryAtomPtr)entry;
+    MP4SecurityInfoAtomPtr sinf         = (MP4SecurityInfoAtomPtr)encv->SecurityInfo;
+
+    if(!sinf) BAILWITHERROR(MP4BadParamErr);
+    fmt = (MP4OriginalFormatAtomPtr)sinf->MP4OriginalFormat;
+    break;
+  }
+
+  default:
     BAILWITHERROR(MP4BadParamErr);
   }
 
-  fmt = (MP4OriginalFormatAtomPtr)rinf->MP4OriginalFormat;
-  if(!fmt)
-  {
-    BAILWITHERROR(MP4BadParamErr);
-  }
+  if(!fmt) BAILWITHERROR(MP4BadParamErr);
 
   *outOrigFmt = fmt->original_format;
+
 bail:
   if(entry) entry->destroy((MP4AtomPtr)entry);
   return err;
@@ -1536,8 +1632,8 @@ ISONewHEVCSampleDescription(MP4Track theTrack, MP4Handle sampleDescriptionH, u32
    * (1) */
   err = GetBytes(bb, 1, &x);
   if(err) goto bail;
-  sps_max_sub_layers                   = ((x & 0xf) >> 1) + 1;
-  config->sps_temporal_id_nesting_flag = x & 1;
+  sps_max_sub_layers       = ((x & 0xf) >> 1) + 1;
+  config->temporalIdNested = x & 1;
 
   /* profile_tier_level */
   /* general_profile_space (2) + general_tier_flag (1) + general_profile_idc (5) */
@@ -1607,7 +1703,7 @@ ISONewHEVCSampleDescription(MP4Track theTrack, MP4Handle sampleDescriptionH, u32
   /* chroma_format_idc */
   y = read_golomb_uev(bb, &err);
   if(err) goto bail;
-  config->chromaFormat = y;
+  config->chroma_format_idc = y;
   if(y == 3)
   {
     /* separate_colour_plane_flag */
@@ -1641,12 +1737,12 @@ ISONewHEVCSampleDescription(MP4Track theTrack, MP4Handle sampleDescriptionH, u32
   /* bit_depth_luma_minus8 */
   y = read_golomb_uev(bb, &err);
   if(err) goto bail;
-  config->bitDepthLumaMinus8 = y;
+  config->bit_depth_luma_minus8 = y;
 
   /* bit_depth_chroma_minus8 */
   y = read_golomb_uev(bb, &err);
   if(err) goto bail;
-  config->bitDepthChromaMinus8 = y;
+  config->bit_depth_chroma_minus8 = y;
 
   if(first_vps)
   {

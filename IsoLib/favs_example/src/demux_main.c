@@ -78,9 +78,8 @@ ISOErr playMyMovie(struct ParamStruct *parameters, char *filename) {
 	/* Loop all the tracks in the container, starting from 1 */
 	for (trackNumber = 1; trackNumber < trackCount + 1; trackNumber++) {
 		FILE *out;
-		ISOHandle spsHandle = NULL;
-		ISOHandle vpsHandle = NULL;
-		ISOHandle ppsHandle = NULL;
+		MP4Handle sampleEntryNALs = NULL;
+
 		MP4GenericAtom subs = NULL;
 		u32 sampleSize;
 		u32 alst_target = 0;
@@ -160,13 +159,39 @@ ISOErr playMyMovie(struct ParamStruct *parameters, char *filename) {
 
 		/* Get sample description from the trak */
 		err = MP4TrackReaderGetCurrentSampleDescription(reader, sampleEntryH); if (err) goto bail;
-		/* Allocate handles for parameter sets */
-		err = ISONewHandle(1, &vpsHandle); err = ISONewHandle(1, &spsHandle); err = ISONewHandle(1, &ppsHandle);
-		if (err) goto bail;
-		/* Grab parameter sets from the sample description */
-		err = ISOGetHEVCSampleDescriptionPS(sampleEntryH, vpsHandle, 32, 1); if (err) goto bail;
-		err = ISOGetHEVCSampleDescriptionPS(sampleEntryH, spsHandle, 33, 1); if (err) goto bail;
-		err = ISOGetHEVCSampleDescriptionPS(sampleEntryH, ppsHandle, 34, 1); if (err) goto bail;
+
+		switch (parameters->hevcExtractionMode)
+		{
+		case 0:
+			printf("Dump all NAL units from the sample entry\n");
+			break;
+		
+		case 1:
+			printf("Only dump NAL units from the hvcC\n");
+			break;
+		
+		case 2:
+			printf("Only dump NAL units from the lhvC\n");
+			break;
+		
+		default:
+			printf("Unknown extraction mode. Dump all NAL units from the sample entry\n");
+			parameters->hevcExtractionMode = 0;
+			break;
+		}
+
+		/* Write Sample Entry NAL Units in the beginning of the trak output file */
+		MP4NewHandle(0, &sampleEntryNALs);
+		err = ISOGetHEVCNALUs(sampleEntryH, sampleEntryNALs, parameters->hevcExtractionMode);
+		if(err)
+		{
+			printf("Failed to extract NAL units with mode %u (err = %d)\n", parameters->hevcExtractionMode, err);
+		}
+		else
+		{
+			err = MP4GetHandleSize(sampleEntryNALs, &sampleSize); if (err) goto bail;
+			fwrite(*sampleEntryNALs, sampleSize, 1, out);
+		}
 
 		ISOGetMediaTimeScale(media, &mediaTimeScale);
 		ISOGetMediaSampleCount(media, &totalSamples);    
@@ -187,16 +212,6 @@ ISOErr playMyMovie(struct ParamStruct *parameters, char *filename) {
 				ISOGetSampletoGroupMap(media, MP4_FOUR_CHAR_CODE('a', 'l', 's', 't'), i + 1, &((u32*)*alst_index)[i]);
 			}
 		}
-
-		/* Write parameter sets in the beginning of the trak output file */
-		err = ISOGetHandleSize(vpsHandle, &sampleSize); if (err) goto bail;
-		fwrite(&syncCode, 4, 1, out); fwrite(*vpsHandle, sampleSize, 1, out);
-
-		err = ISOGetHandleSize(spsHandle, &sampleSize); if (err) goto bail;
-		fwrite(&syncCode, 4, 1, out); fwrite(*spsHandle, sampleSize, 1, out);
-
-		err = ISOGetHandleSize(ppsHandle, &sampleSize); if (err) goto bail;
-		fwrite(&syncCode, 4, 1, out); fwrite(*ppsHandle, sampleSize, 1, out);
 		
 		/* Handle the case when seek parameter is given and alst is present */
 		if (parameters->seek && alst) {
@@ -286,9 +301,7 @@ ISOErr playMyMovie(struct ParamStruct *parameters, char *filename) {
 		err = ISODisposeHandle(sampleH);
 		err = ISODisposeHandle(decoderConfigH);
 		err = ISODisposeTrackReader(reader);
-		err = ISODisposeHandle(spsHandle);
-		err = ISODisposeHandle(ppsHandle);
-		err = ISODisposeHandle(vpsHandle);
+		MP4DisposeHandle(sampleEntryNALs);
 	}
 	free(outSampleName);
 	err = ISODisposeMovie(moov);
@@ -340,5 +353,5 @@ int main(int argc, char* argv[])
 
 	cleanParameters(&parameters);
 
-	return 1;
+	return 0;
 }

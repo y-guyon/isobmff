@@ -129,6 +129,7 @@ enum
   ISOItemReferenceAtomType                     = MP4_FOUR_CHAR_CODE('i', 'r', 'e', 'f'),
   ISOVCConfigAtomType                          = MP4_FOUR_CHAR_CODE('a', 'v', 'c', 'C'),
   ISOHEVCConfigAtomType                        = MP4_FOUR_CHAR_CODE('h', 'v', 'c', 'C'),
+  ISOLHEVCConfigAtomType                       = MP4_FOUR_CHAR_CODE('l', 'h', 'v', 'C'),
   ISOVVCConfigAtomType                         = MP4_FOUR_CHAR_CODE('v', 'v', 'c', 'C'),
   ISOVVCNALUConfigAtomType                     = MP4_FOUR_CHAR_CODE('v', 'v', 'n', 'C'),
   ISOAVCSampleEntryAtomType                    = MP4_FOUR_CHAR_CODE('a', 'v', 'c', '1'),
@@ -858,14 +859,14 @@ typedef struct MP4VisualSampleEntryAtom
   /* u32			reserved3;         uint(32) = 0x01400f0 */
   u32 width;
   u32 height;
-  u32 reserved4; /* uint(32) = 0x0048000 */
-  u32 reserved5; /* uint(32) = 0x0048000 */
-  u32 reserved6; /* uint(32) = 0 */
-  u32 reserved7; /* uint(16) = 1 */
+  u32 horizresolution; /* uint(32) = 0x0048000 */
+  u32 vertresolution;  /* uint(32) = 0x0048000 */
+  u32 reserved6;       /* uint(32) = 0 */
+  u32 frame_count;     /* uint(16) = 1 */
   u32 nameLength;
-  char name31[31];
-  u32 reserved8; /* uint(16) = 24 */
-  s32 reserved9; /* int(16) = -1 */
+  char compressorname31[31];
+  u32 depth;        /* uint(16) = 24 */
+  s32 pre_defined2; /* int(16) = -1 */
 
 } MP4VisualSampleEntryAtom, *MP4VisualSampleEntryAtomPtr;
 
@@ -1120,24 +1121,55 @@ typedef struct ISOHEVCConfigAtom
   MP4_BASE_ATOM
   MP4Err (*addParameterSet)(struct ISOHEVCConfigAtom *self, MP4Handle ps, u32 where);
   MP4Err (*getParameterSet)(struct ISOHEVCConfigAtom *self, MP4Handle ps, u32 where, u32 index);
+  u32 configurationVersion;
+  u32 general_profile_space;
+  u32 general_tier_flag;
   u32 general_profile_idc;
   u32 general_profile_compatibility_flags;
+  u64 general_constraint_indicator_flags;
   u32 general_level_idc;
+  u32 min_spatial_segmentation_idc;
+  u32 parallelismType;
+  u32 chroma_format_idc;
+  u32 bit_depth_luma_minus8;
+  u32 bit_depth_chroma_minus8;
+  u32 avgFrameRate;
+  u32 constantFrameRate;
+  u32 numTemporalLayers;
+  u32 temporalIdNested;
   u32 lengthSizeMinusOne;
-  u32 complete_rep;
   u32 numOfArrays;
+  u32 complete_rep;
   struct
   {
     u32 array_completeness;
-    u32 NALtype;
+    u32 NAL_unit_type;
+    u32 numNalus;
     MP4LinkedList nalList;
-  } arrays[8];
-  u32 chromaFormat;
-  u32 avgFrameRate;
-  u32 sps_temporal_id_nesting_flag;
-  u32 bitDepthLumaMinus8;
-  u32 bitDepthChromaMinus8;
+  } arrays[9];
 } ISOHEVCConfigAtom, *ISOHEVCConfigAtomPtr;
+
+typedef struct ISOLHEVCConfigAtom
+{
+  MP4_BASE_ATOM
+  MP4Err (*addNALUnit)(struct ISOLHEVCConfigAtom *self, MP4Handle ps, u32 where);
+  MP4Err (*getNALUnit)(struct ISOLHEVCConfigAtom *self, MP4Handle ps, u32 where, u32 index);
+  u32 configurationVersion;
+  u32 min_spatial_segmentation_idc;
+  u32 parallelismType;
+  u32 numTemporalLayers;
+  u32 temporalIdNested;
+  u32 lengthSizeMinusOne;
+  u32 numOfArrays;
+  u32 complete_rep;
+  struct
+  {
+    u32 array_completeness;
+    u32 NAL_unit_type;
+    u32 numNalus;
+    MP4LinkedList nalList;
+  } arrays[9];
+} ISOLHEVCConfigAtom, *ISOLHEVCConfigAtomPtr;
 
 typedef struct ISOVVCConfigAtom
 {
@@ -2327,6 +2359,7 @@ MP4Err MP4CreateItemPropertyContainerAtom(MP4ItemPropertyContainerAtomPtr *outAt
 MP4Err MP4CreateItemPropertyAssociationAtom(MP4ItemPropertyAssociationAtomPtr *outAtom);
 
 MP4Err MP4CreateHEVCConfigAtom(ISOHEVCConfigAtomPtr *outAtom);
+MP4Err MP4CreateLHEVCConfigAtom(ISOLHEVCConfigAtomPtr *outAtom);
 MP4Err MP4CreateVVCConfigAtom(ISOVVCConfigAtomPtr *outAtom);
 MP4Err MP4CreateVVCNALUConfigAtom(ISOVVCNALUConfigAtomPtr *outAtom);
 

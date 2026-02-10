@@ -34,6 +34,7 @@
 #endif
 
 MP4Err MP4CreateHEVCConfigAtom(ISOHEVCConfigAtomPtr *outAtom);
+MP4Err MP4CreateLHEVCConfigAtom(ISOLHEVCConfigAtomPtr *outAtom);
 
 static MP4AtomPtr MP4BaseAtomClassPtr = 0;
 
@@ -632,6 +633,10 @@ MP4Err MP4CreateAtom(u32 atomType, MP4AtomPtr *outAtom)
 
   case ISOHEVCConfigAtomType:
     err = MP4CreateHEVCConfigAtom((ISOHEVCConfigAtomPtr *)&newAtom);
+    break;
+
+  case ISOLHEVCConfigAtomType:
+    err = MP4CreateLHEVCConfigAtom((ISOLHEVCConfigAtomPtr *)&newAtom);
     break;
 
   case MP4BoxedMetadataSampleEntryType:

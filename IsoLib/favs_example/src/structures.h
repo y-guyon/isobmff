@@ -136,6 +136,7 @@ struct ParamStruct {
 
 	u32 subsample_information;
 	u32 compactSampleToGroup;
+	u32 hevcExtractionMode; /* 0 = all (default), 1 = hvcC only, 2 = lhvC only */
 };
 
 
