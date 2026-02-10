@@ -8,7 +8,7 @@ The T.35 Metadata Tool provides a clean, modular architecture for working with T
 
 ### Key Features
 
-- **Multiple Injection Methods**: Support for MEBX tracks (me4c/it35 namespaces), dedicated metadata tracks, and sample groups
+- **Multiple Injection Methods**: Support for MEBX tracks (me4c namespace), dedicated metadata tracks, and sample groups
 - **Flexible Extraction**: Auto-detection or manual selection of extraction strategies
 - **Multiple Source Formats**: JSON manifests with binary references, SMPTE folder structures
 - **T.35 Prefix Support**: Configurable ITU-T T.35 country/terminal provider codes
@@ -25,13 +25,12 @@ The tool follows a modular design with three main components:
 
 2. **Injection Strategies** - Define how metadata is embedded into MP4
    - MEBX track with me4c namespace
-   - MEBX track with it35 namespace
    - Dedicated metadata track (it35)
    - Sample groups
 
 3. **Extraction Strategies** - Define how metadata is retrieved from MP4
    - Auto-detection (tries all methods)
-   - MEBX extraction (me4c/it35)
+   - MEBX extraction (me4c)
    - Dedicated track extraction
    - Sample group extraction
    - SEI conversion (stub)

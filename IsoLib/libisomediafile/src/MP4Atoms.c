@@ -424,10 +424,6 @@ MP4Err MP4CreateAtom(u32 atomType, MP4AtomPtr *outAtom)
     err = MP4CreateExtendedLanguageTagAtom((MP4ExtendedLanguageTagAtomPtr *)&newAtom);
     break;
 
-  case MP4T35CommonHeaderBoxType:
-    err = MP4CreateT35CommonHeaderBox((MP4T35CommonHeaderBoxPtr *)&newAtom);
-    break;
-
   case MP4T35MetadataSampleEntryType:
     err = MP4CreateT35MetadataSampleEntry((MP4T35MetadataSampleEntryPtr *)&newAtom);
     break;

@@ -81,39 +81,51 @@ static MP4Err findIt35MetadataTrack(MP4Movie moov,
 
         LOG_INFO("Found IT35 track with ID {}", trackID);
 
-        // Read t35C box from sample entry and verify prefix matches
-        MP4GenericAtom t35CAtom = nullptr;
-        err = ISOGetAtomFromSampleDescription(sampleEntryH, MP4T35CommonHeaderBoxType, &t35CAtom);
+        // Get T35MetadataSampleEntry to read description and t35_identifier
+        MP4T35MetadataSampleEntryPtr it35Entry = (MP4T35MetadataSampleEntryPtr)(*sampleEntryH);
 
-        if (err == MP4NoErr && t35CAtom) {
-            MP4T35CommonHeaderBoxPtr t35C = (MP4T35CommonHeaderBoxPtr)t35CAtom;
-            if (t35C->t35_prefix_text) {
-                std::string prefixInFile(t35C->t35_prefix_text);
-                LOG_DEBUG("Found t35C box with prefix: '{}'", prefixInFile);
+        if (it35Entry && it35Entry->t35_identifier && it35Entry->t35_identifier_size > 0) {
+            // Convert t35_identifier bytes to hex string
+            std::string hexStr;
+            hexStr.reserve(it35Entry->t35_identifier_size * 2);
+            for (u32 i = 0; i < it35Entry->t35_identifier_size; i++) {
+                char buf[3];
+                snprintf(buf, sizeof(buf), "%02X", it35Entry->t35_identifier[i]);
+                hexStr += buf;
+            }
 
-                // Parse both prefixes to compare hex part only
-                T35Prefix requestedPrefix(t35PrefixStr);
-                T35Prefix filePrefix(prefixInFile);
+            // Build prefix string: "HEX:Description"
+            std::string filePrefix = hexStr;
+            if (it35Entry->description && it35Entry->description[0] != '\0') {
+                filePrefix += ":";
+                filePrefix += it35Entry->description;
+                LOG_DEBUG("Found T35 identifier: {} with description: '{}'", hexStr, it35Entry->description);
+            } else {
+                LOG_DEBUG("Found T35 identifier: {} (no description)", hexStr);
+            }
 
-                // Verify hex prefix matches (ignore description)
-                if (requestedPrefix.hex() != filePrefix.hex()) {
-                    LOG_DEBUG("T35 hex '{}' does not match requested hex '{}'",
-                             filePrefix.hex(), requestedPrefix.hex());
-                    MP4DisposeHandle(sampleEntryH);
-                    continue;  // Try next track
-                }
-                LOG_DEBUG("T35 hex matches requested hex");
+            // Parse both prefixes to compare hex part only
+            T35Prefix requestedPrefix(t35PrefixStr);
+            T35Prefix filePrefixParsed(filePrefix);
 
-                // Warn if descriptions differ (informative only)
-                if (!requestedPrefix.description().empty() &&
-                    !filePrefix.description().empty() &&
-                    requestedPrefix.description() != filePrefix.description()) {
-                    LOG_WARN("T.35 description mismatch: requested '{}' but file has '{}'",
-                            requestedPrefix.description(), filePrefix.description());
-                }
+            // Verify hex prefix matches (ignore description)
+            if (requestedPrefix.hex() != filePrefixParsed.hex()) {
+                LOG_DEBUG("T35 hex '{}' does not match requested hex '{}'",
+                         filePrefixParsed.hex(), requestedPrefix.hex());
+                MP4DisposeHandle(sampleEntryH);
+                continue;  // Try next track
+            }
+            LOG_DEBUG("T35 hex matches requested hex");
+
+            // Warn if descriptions differ (informative only)
+            if (!requestedPrefix.description().empty() &&
+                !filePrefixParsed.description().empty() &&
+                requestedPrefix.description() != filePrefixParsed.description()) {
+                LOG_WARN("T.35 description mismatch: requested '{}' but file has '{}'",
+                        requestedPrefix.description(), filePrefixParsed.description());
             }
         } else {
-            LOG_WARN("Could not read t35C box from IT35 sample entry");
+            LOG_WARN("Could not read t35_identifier from IT35 sample entry");
         }
 
         MP4DisposeHandle(sampleEntryH);

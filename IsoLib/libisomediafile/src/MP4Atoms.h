@@ -93,7 +93,6 @@ enum
   MP4SubSampleInformationAtomType              = MP4_FOUR_CHAR_CODE('s', 'u', 'b', 's'),
   MP4SyncSampleAtomType                        = MP4_FOUR_CHAR_CODE('s', 't', 's', 's'),
   MP4SyncTrackReferenceAtomType                = MP4_FOUR_CHAR_CODE('s', 'y', 'n', 'c'),
-  MP4T35CommonHeaderBoxType                    = MP4_FOUR_CHAR_CODE('t', '3', '5', 'C'),
   MP4T35MetadataSampleEntryType                = MP4_FOUR_CHAR_CODE('i', 't', '3', '5'),
   MP4TimeToSampleAtomType                      = MP4_FOUR_CHAR_CODE('s', 't', 't', 's'),
   MP4TrackAtomType                             = MP4_FOUR_CHAR_CODE('t', 'r', 'a', 'k'),
@@ -540,12 +539,6 @@ typedef struct MP4ExtendedLanguageTag
   char *extended_language;
 } MP4ExtendedLanguageTagAtom, *MP4ExtendedLanguageTagAtomPtr;
 
-typedef struct MP4T35CommonHeaderBox
-{
-  MP4_FULL_ATOM
-  char *t35_prefix_text;
-} MP4T35CommonHeaderBox, *MP4T35CommonHeaderBoxPtr;
-
 #define COMMON_MINF_ATOM_FIELDS                                                                   \
   MP4Err (*addSampleReference)(struct MP4MediaInformationAtom * self, u64 dataOffset,             \
                                u32 sampleCount, MP4Handle durationsH, MP4Handle sizesH,           \
@@ -875,7 +868,9 @@ typedef struct MP4T35MetadataSampleEntry
 {
   MP4_BASE_ATOM
   COMMON_SAMPLE_ENTRY_FIELDS
-  MP4T35CommonHeaderBoxPtr t35_prefix_box;
+  char *description;           /* UTF-8 string, '\0' if empty */
+  u8 *t35_identifier;          /* Variable length byte array */
+  u32 t35_identifier_size;     /* Size of t35_identifier in bytes */
 } MP4T35MetadataSampleEntry, *MP4T35MetadataSampleEntryPtr;
 
 typedef struct MP4VisualSampleEntryAtom
@@ -2360,8 +2355,6 @@ MP4Err MP4CreateShadowSyncAtom(MP4ShadowSyncAtomPtr *outAtom);
 MP4Err MP4CreateSoundMediaHeaderAtom(MP4SoundMediaHeaderAtomPtr *outAtom);
 MP4Err MP4CreateSubSampleInformationAtom(MP4SubSampleInformationAtomPtr *outAtom);
 MP4Err MP4CreateSyncSampleAtom(MP4SyncSampleAtomPtr *outAtom);
-MP4Err MP4CreateT35CommonHeaderBox(MP4T35CommonHeaderBoxPtr *outAtom);
-MP4Err MP4SetT35CommonHeaderBoxText(MP4T35CommonHeaderBoxPtr self, const char *text);
 MP4Err MP4CreateT35MetadataSampleEntry(MP4T35MetadataSampleEntryPtr *outAtom);
 MP4Err MP4CreateTimeToSampleAtom(MP4TimeToSampleAtomPtr *outAtom);
 MP4Err MP4CreateTrackAtom(MP4TrackAtomPtr *outAtom);

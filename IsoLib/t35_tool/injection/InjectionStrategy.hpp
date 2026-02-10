@@ -22,7 +22,7 @@ namespace t35 {
  * - Linking metadata to video track
  *
  * Different strategies implement different MP4 storage methods:
- * - MEBX tracks (it35 or me4c namespace)
+ * - MEBX tracks (me4c namespace)
  * - Dedicated metadata tracks
  * - Sample groups
  * - Sample entry boxes
@@ -33,7 +33,7 @@ public:
 
     /**
      * Get strategy name
-     * @return Name string (e.g., "mebx-it35", "mebx-me4c")
+     * @return Name string (e.g., "mebx-me4c", "dedicated-it35")
      */
     virtual std::string getName() const = 0;
 
@@ -77,12 +77,9 @@ public:
  * Factory function to create injection strategy from name
  *
  * Available strategies:
- * - "mebx-it35": MEBX track with it35 namespace
  * - "mebx-me4c": MEBX track with me4c namespace
- * - "dedicated-it35": Dedicated metadata track (stub)
- * - "sample-group": Sample group (stub)
- * - "sample-entry-box": Box in sample entry (stub)
- * - "default-sample-group": Default sample group (stub)
+ * - "dedicated-it35": Dedicated metadata track
+ * - "sample-group": Sample group
  *
  * @param strategyName Strategy name
  * @return Unique pointer to InjectionStrategy

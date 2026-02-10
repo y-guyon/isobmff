@@ -9,7 +9,7 @@ namespace t35 {
  *
  * Creates a dedicated T.35 timed metadata track with:
  * - Sample entry type: 'it35' (T35MetadataSampleEntry)
- * - t35C box containing T.35 prefix
+ * - t35_identifier and description fields in sample entry
  * - Samples contain only T.35 payload (no box wrapper)
  * - Optional 'rndr' track reference to video track
  *
@@ -23,7 +23,7 @@ public:
     std::string getName() const override { return "dedicated-it35"; }
 
     std::string getDescription() const override {
-        return "Dedicated IT35 metadata track with t35C box";
+        return "Dedicated IT35 metadata track with description and t35_identifier";
     }
 
     bool isApplicable(const MetadataMap& items,

@@ -22,7 +22,7 @@ namespace t35 {
  * - Writing output files (binary, JSON, or video with SEI)
  *
  * Different strategies extract from different MP4 storage methods:
- * - MEBX tracks (it35 or me4c namespace)
+ * - MEBX tracks (me4c namespace)
  * - Dedicated metadata tracks
  * - Sample groups
  * - Sample entry boxes
@@ -34,7 +34,7 @@ public:
 
     /**
      * Get strategy name
-     * @return Name string (e.g., "mebx-it35", "auto", "sei")
+     * @return Name string (e.g., "mebx-me4c", "auto", "sei")
      */
     virtual std::string getName() const = 0;
 
@@ -77,11 +77,9 @@ public:
  *
  * Available strategies:
  * - "auto": Auto-detect (tries all strategies)
- * - "mebx-it35": MEBX track with it35 namespace
- * - "mebx-me4c": MEBX track with me4c namespace (stub)
- * - "dedicated-it35": Dedicated metadata track (stub)
- * - "sample-group": Sample group (stub)
- * - "sample-entry-box": Sample entry box (stub)
+ * - "mebx-me4c": MEBX track with me4c namespace
+ * - "dedicated-it35": Dedicated metadata track
+ * - "sample-group": Sample group
  * - "sei": Convert metadata to video with SEI NALs
  *
  * @param strategyName Strategy name

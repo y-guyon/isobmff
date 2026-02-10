@@ -2411,33 +2411,127 @@ bail:
 
 /* ==================== T.35 Metadata Track Functions ==================== */
 
+/* Helper: Parse T.35 prefix string into hex identifier and description
+ * Format: "HEXSTRING:Description"
+ * Example: "B500900001:SMPTE-ST2094-50"
+ */
+static MP4Err parseT35PrefixString(const char *t35_prefix_text, u8 **outIdentifier,
+                                   u32 *outIdentifierSize, char **outDescription)
+{
+  MP4Err err;
+  const char *colon;
+  const char *hexStart;
+  size_t hexLen;
+  u32 identifierSize;
+  u8 *identifier;
+  char *description;
+
+  if(t35_prefix_text == NULL || outIdentifier == NULL || outIdentifierSize == NULL ||
+     outDescription == NULL)
+    BAILWITHERROR(MP4BadParamErr);
+
+  /* Find colon separator */
+  colon = strchr(t35_prefix_text, ':');
+  if(colon)
+  {
+    hexLen = colon - t35_prefix_text;
+  }
+  else
+  {
+    hexLen = strlen(t35_prefix_text);
+  }
+
+  /* Check if hex length is even */
+  if(hexLen % 2 != 0) BAILWITHERROR(MP4BadParamErr);
+
+  identifierSize = (u32)(hexLen / 2);
+  if(identifierSize == 0) BAILWITHERROR(MP4BadParamErr);
+
+  /* Allocate identifier buffer */
+  identifier = (u8 *)calloc(identifierSize, 1);
+  if(identifier == NULL) BAILWITHERROR(MP4NoMemoryErr);
+
+  /* Parse hex string */
+  hexStart = t35_prefix_text;
+  for(u32 i = 0; i < identifierSize; i++)
+  {
+    char hexByte[3];
+    hexByte[0] = hexStart[i * 2];
+    hexByte[1] = hexStart[i * 2 + 1];
+    hexByte[2] = '\0';
+
+    char *endPtr;
+    unsigned long value = strtoul(hexByte, &endPtr, 16);
+    if(*endPtr != '\0' || value > 255)
+    {
+      free(identifier);
+      BAILWITHERROR(MP4BadParamErr);
+    }
+    identifier[i] = (u8)value;
+  }
+
+  /* Parse description (after colon) */
+  if(colon && colon[1] != '\0')
+  {
+    size_t descLen = strlen(colon + 1);
+    description    = (char *)calloc(descLen + 1, 1);
+    if(description == NULL)
+    {
+      free(identifier);
+      BAILWITHERROR(MP4NoMemoryErr);
+    }
+    strcpy(description, colon + 1);
+  }
+  else
+  {
+    /* Empty description */
+    description = NULL;
+  }
+
+  *outIdentifier     = identifier;
+  *outIdentifierSize = identifierSize;
+  *outDescription    = description;
+
+  return MP4NoErr;
+
+bail:
+  TEST_RETURN(err);
+  return err;
+}
+
 MP4_EXTERN(MP4Err)
 ISONewT35SampleDescription(MP4T35MetadataSampleEntryPtr *outSE, u32 dataReferenceIndex,
                            const char *t35_prefix_text)
 {
   MP4Err err;
   MP4T35MetadataSampleEntryPtr it35;
-  MP4T35CommonHeaderBoxPtr t35c;
+  u8 *identifier                = NULL;
+  u32 identifierSize            = 0;
+  char *description             = NULL;
 
   if(outSE == NULL || t35_prefix_text == NULL) BAILWITHERROR(MP4BadParamErr);
 
+  /* Parse t35_prefix_text into identifier and description */
+  err = parseT35PrefixString(t35_prefix_text, &identifier, &identifierSize, &description);
+  if(err) goto bail;
+
+  /* Create T35 sample entry */
   err = MP4CreateT35MetadataSampleEntry(&it35);
   if(err) goto bail;
   it35->dataReferenceIndex = dataReferenceIndex;
 
-  err = MP4CreateT35CommonHeaderBox(&t35c);
-  if(err) goto bail;
-
-  err = MP4SetT35CommonHeaderBoxText(t35c, t35_prefix_text);
-  if(err) goto bail;
-
-  err = MP4AddListEntry((void *)t35c, it35->ExtensionAtomList);
-  if(err) goto bail;
-  it35->t35_prefix_box = t35c;
+  /* Set description and t35_identifier fields */
+  it35->description          = description;
+  it35->t35_identifier       = identifier;
+  it35->t35_identifier_size  = identifierSize;
 
   *outSE = it35;
 
+  return MP4NoErr;
+
 bail:
+  if(identifier) free(identifier);
+  if(description) free(description);
   TEST_RETURN(err);
   return err;
 }
@@ -2474,7 +2568,7 @@ ISONewT35MetadataTrack(MP4Movie theMovie, u32 timescale, const char *t35_prefix_
     if(err) goto bail;
   }
 
-  /* Create T35 sample entry with t35C box */
+  /* Create T35 sample entry with description and t35_identifier */
   err = ISONewT35SampleDescription(&it35, 1, t35_prefix_text);
   if(err) goto bail;
 

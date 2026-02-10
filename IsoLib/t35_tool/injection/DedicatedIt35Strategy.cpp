@@ -237,7 +237,7 @@ MP4Err DedicatedIt35Strategy::inject(const InjectionConfig& config,
         goto bail;
     }
 
-    // Create dedicated IT35 metadata track with t35C box
+    // Create dedicated IT35 metadata track
     LOG_DEBUG("Creating dedicated IT35 metadata track with T.35 prefix: {}", prefix.toString());
     err = ISONewT35MetadataTrack(config.movie,
                                  videoTimescale,

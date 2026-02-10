@@ -55,7 +55,7 @@ SMPTE folder source uses individual JSON files per metadata item with SMPTE ST 2
 cd mybuild
 ../bin/t35_tool inject input.mp4 output.mp4 \
   --source generic-json:../IsoLib/t35_tool/test_data/test_manifest.json \
-  --method mebx-it35 \
+  --method mebx-me4c \
   --t35-prefix B500900001:SMPTE-ST2094-50
 ```
 
@@ -72,7 +72,7 @@ Run the automated test script from the test_data directory:
 cd IsoLib/t35_tool/test_data
 ../../bin/t35_tool inject ST2094-50_LightDetector.mov output.mov \
   --source smpte-folder:./ExampleJson \
-  --method mebx-it35 \
+  --method mebx-me4c \
   --t35-prefix B500900001:SMPTE-ST2094-50
 ```
 
@@ -84,9 +84,8 @@ cd IsoLib/t35_tool/test_data
 ```
 
 The test script validates all injection methods:
-- **ME4C** (default): MEBX track with me4c namespace
+- **ME4C**: MEBX track with me4c namespace (default)
 - **Dedicated Track**: Dedicated IT35 metadata track
-- **MEBX IT35**: MEBX track with it35 namespace
 - **Sample Group**: Video track sample groups (sgpd/sbgp)
 
 Each test performs injection followed by extraction using auto-detection.
