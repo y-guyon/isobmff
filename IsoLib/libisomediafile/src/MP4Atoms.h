@@ -868,9 +868,9 @@ typedef struct MP4T35MetadataSampleEntry
 {
   MP4_BASE_ATOM
   COMMON_SAMPLE_ENTRY_FIELDS
-  char *description;           /* UTF-8 string, '\0' if empty */
-  u8 *t35_identifier;          /* Variable length byte array */
-  u32 t35_identifier_size;     /* Size of t35_identifier in bytes */
+  char *description;       /* UTF-8 string, '\0' if empty */
+  u8 *t35_identifier;      /* Variable length byte array */
+  u32 t35_identifier_size; /* Size of t35_identifier in bytes */
 } MP4T35MetadataSampleEntry, *MP4T35MetadataSampleEntryPtr;
 
 typedef struct MP4VisualSampleEntryAtom

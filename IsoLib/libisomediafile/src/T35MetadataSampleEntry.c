@@ -191,9 +191,9 @@ MP4Err MP4CreateT35MetadataSampleEntry(MP4T35MetadataSampleEntryPtr *outAtom)
   self->dataReferenceIndex = 1;
   memset(self->reserved, 0, 6);
 
-  self->description          = NULL;
-  self->t35_identifier       = NULL;
-  self->t35_identifier_size  = 0;
+  self->description         = NULL;
+  self->t35_identifier      = NULL;
+  self->t35_identifier_size = 0;
 
   *outAtom = self;
 bail:

@@ -2505,9 +2505,9 @@ ISONewT35SampleDescription(MP4T35MetadataSampleEntryPtr *outSE, u32 dataReferenc
 {
   MP4Err err;
   MP4T35MetadataSampleEntryPtr it35;
-  u8 *identifier                = NULL;
-  u32 identifierSize            = 0;
-  char *description             = NULL;
+  u8 *identifier     = NULL;
+  u32 identifierSize = 0;
+  char *description  = NULL;
 
   if(outSE == NULL || t35_prefix_text == NULL) BAILWITHERROR(MP4BadParamErr);
 
@@ -2521,9 +2521,9 @@ ISONewT35SampleDescription(MP4T35MetadataSampleEntryPtr *outSE, u32 dataReferenc
   it35->dataReferenceIndex = dataReferenceIndex;
 
   /* Set description and t35_identifier fields */
-  it35->description          = description;
-  it35->t35_identifier       = identifier;
-  it35->t35_identifier_size  = identifierSize;
+  it35->description         = description;
+  it35->t35_identifier      = identifier;
+  it35->t35_identifier_size = identifierSize;
 
   *outSE = it35;
 
