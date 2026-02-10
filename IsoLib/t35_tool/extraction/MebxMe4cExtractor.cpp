@@ -199,12 +199,49 @@ static MP4Err findMebxMe4cTrackReader(MP4Movie moov,
             LOG_DEBUG("  setupInfo size = {} bytes", setupInfoSize);
 
             if (setupInfoSize > 0) {
-                std::string setupInfoStr((char*)*setupInfoH, setupInfoSize);
-                LOG_DEBUG("  setupInfo = '{}'", setupInfoStr);
+                // Parse setupInfo binary format:
+                // 1. utf8string description (null-terminated)
+                // 2. unsigned int(8) t35_identifier[] (remaining bytes)
 
-                // Parse both prefixes to compare hex part only
+                char* setupData = (char*)*setupInfoH;
+
+                // Read null-terminated description
+                size_t descLen = 0;
+                for (size_t i = 0; i < setupInfoSize; i++) {
+                    if (setupData[i] == '\0') {
+                        descLen = i;
+                        break;
+                    }
+                }
+
+                std::string desc;
+                if (descLen > 0) {
+                    desc = std::string(setupData, descLen);
+                }
+
+                // Read remaining bytes as t35_identifier
+                u32 identifierStart = descLen + 1;  // Skip null terminator
+                u32 identifierSize = setupInfoSize - identifierStart;
+
+                std::vector<uint8_t> identifierBytes;
+                if (identifierSize > 0 && identifierStart < setupInfoSize) {
+                    identifierBytes.assign(
+                        (uint8_t*)(setupData + identifierStart),
+                        (uint8_t*)(setupData + setupInfoSize)
+                    );
+                }
+
+                // Convert identifier bytes to hex string
+                std::string hexStr = T35Prefix::bytesToHex(identifierBytes);
+
+                LOG_DEBUG("  Parsed setupInfo: description='{}', identifier={} ({} bytes)",
+                         desc.empty() ? "(empty)" : desc, hexStr, identifierBytes.size());
+
+                // Create T35Prefix from parsed components
+                T35Prefix filePrefix(hexStr, desc);
+
+                // Parse requested prefix
                 T35Prefix requestedPrefix(t35PrefixStr);
-                T35Prefix filePrefix(setupInfoStr);
 
                 // Verify hex prefix matches (ignore description)
                 if (requestedPrefix.hex() == filePrefix.hex()) {

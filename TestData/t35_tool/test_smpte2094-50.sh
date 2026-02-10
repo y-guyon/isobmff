@@ -64,7 +64,12 @@ TOOL=$(find_tool) || exit 1
 INPUT_VIDEO="${TEST_DATA_DIR}/ST2094-50_LightDetector.mov"
 OUTPUT_DIR="${TEST_DATA_DIR}/output_smpte"
 T35_PREFIX="B500900001:SMPTE-ST2094-50"
-METHOD="mebx-me4c"  # Using approved method (mebx-me4c, dedicated-it35, or sample-group)
+
+# Injection methods to test
+METHODS=(
+    "mebx-me4c"
+    "dedicated-it35"
+)
 
 # SMPTE test folders
 SMPTE_FOLDERS=(
@@ -114,21 +119,22 @@ check_prerequisites() {
     printf "\n"
 }
 
-# Test a single SMPTE folder
+# Test a single SMPTE folder with a specific method
 test_smpte_folder() {
     local folder=$1
-    local injected_file="${OUTPUT_DIR}/${folder}_injected.mov"
-    local extract_dir="${OUTPUT_DIR}/${folder}_extracted"
-    local inject_log="${OUTPUT_DIR}/${folder}_inject.log"
-    local extract_log="${OUTPUT_DIR}/${folder}_extract.log"
+    local method=$2
+    local injected_file="${OUTPUT_DIR}/${folder}_${method}.mov"
+    local extract_dir="${OUTPUT_DIR}/${folder}_${method}_extracted"
+    local inject_log="${OUTPUT_DIR}/${folder}_${method}_inject.log"
+    local extract_log="${OUTPUT_DIR}/${folder}_${method}_extract.log"
 
-    log_section "Testing: ${folder}"
+    log_section "Testing: ${folder} with ${method}"
 
     # Inject
-    log_info "Injecting SMPTE ST 2094-50 metadata from ${folder}..."
+    log_info "Injecting SMPTE ST 2094-50 metadata from ${folder} using ${method}..."
     if "${TOOL}" inject "${INPUT_VIDEO}" "${injected_file}" \
         --source "smpte-folder:${TEST_DATA_DIR}/${folder}" \
-        --method "${METHOD}" \
+        --method "${method}" \
         --t35-prefix "${T35_PREFIX}" \
         > "${inject_log}" 2>&1; then
         log_success "Injection successful"
@@ -163,7 +169,7 @@ main() {
     log_info "Test configuration:"
     log_info "  Input video: ${INPUT_VIDEO}"
     log_info "  Output directory: ${OUTPUT_DIR}"
-    log_info "  Injection method: ${METHOD}"
+    log_info "  Injection methods: ${METHODS[*]}"
     log_info "  T.35 prefix: ${T35_PREFIX}"
     printf "\n"
 
@@ -171,16 +177,26 @@ main() {
     mkdir -p "${OUTPUT_DIR}"
     check_prerequisites
 
-    # Test all SMPTE folders
+    # Test all SMPTE folders with all methods
     local failed=0
-    for folder in "${SMPTE_FOLDERS[@]}"; do
-        if ! test_smpte_folder "${folder}"; then
-            failed=$((failed + 1))
-        fi
+    local total=0
+    for method in "${METHODS[@]}"; do
+        log_section "Testing with method: ${method}"
+        for folder in "${SMPTE_FOLDERS[@]}"; do
+            total=$((total + 1))
+            if ! test_smpte_folder "${folder}" "${method}"; then
+                failed=$((failed + 1))
+            fi
+        done
     done
 
     # Summary
     log_section "Test Summary"
+    log_info "Total tests: ${total} (${#METHODS[@]} methods × ${#SMPTE_FOLDERS[@]} folders)"
+    log_info "Passed: $((total - failed))"
+    log_info "Failed: ${failed}"
+    printf "\n"
+
     if [ ${failed} -eq 0 ]; then
         log_success "All SMPTE tests passed!"
         exit 0

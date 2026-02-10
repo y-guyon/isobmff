@@ -7,6 +7,7 @@ extern "C" {
 }
 
 #include <algorithm>
+#include <cstring>
 #include <vector>
 
 namespace t35 {
@@ -394,15 +395,46 @@ MP4Err MebxMe4cStrategy::inject(const InjectionConfig& config,
     }
     LOG_DEBUG("Created key_value handle with it35 4CC");
 
-    // Build setupInfo with T.35 prefix (full string representation)
+    // Build setupInfo with T.35 prefix in binary format:
+    // 1. utf8string description (null-terminated, '\0' if empty)
+    // 2. unsigned int(8) t35_identifier[] (binary bytes)
     MP4Handle setupInfo = nullptr;
-    err = stringToHandle(prefix.toString(), &setupInfo);
-    if (err) {
-        LOG_ERROR("Failed to create T.35 prefix setupInfo handle (err={})", err);
-        MP4DisposeHandle(key_value);
-        return err;
+    {
+        const std::string& desc = prefix.description();
+        std::vector<uint8_t> identifierBytes = prefix.toBytes();
+
+        // Calculate total size: description length + null terminator + identifier bytes
+        u32 descLen = desc.empty() ? 1 : (u32)desc.size() + 1;  // '\0' if empty, or string + '\0'
+        u32 totalSize = descLen + (u32)identifierBytes.size();
+
+        err = MP4NewHandle(totalSize, &setupInfo);
+        if (err) {
+            LOG_ERROR("Failed to create setupInfo handle (err={})", err);
+            MP4DisposeHandle(key_value);
+            return err;
+        }
+
+        char* buffer = *setupInfo;
+        u32 offset = 0;
+
+        // Write description as null-terminated UTF-8 string
+        if (desc.empty()) {
+            buffer[offset++] = '\0';  // Just null byte if no description
+        } else {
+            memcpy(buffer + offset, desc.c_str(), desc.size());
+            offset += desc.size();
+            buffer[offset++] = '\0';  // Null terminator
+        }
+
+        // Write t35_identifier as binary bytes
+        if (!identifierBytes.empty()) {
+            memcpy(buffer + offset, identifierBytes.data(), identifierBytes.size());
+            offset += identifierBytes.size();
+        }
+
+        LOG_DEBUG("Created setupInfo handle: description='{}' ({} bytes), identifier={} bytes",
+                  desc.empty() ? "(empty)" : desc, descLen, identifierBytes.size());
     }
-    LOG_DEBUG("Created setupInfo handle with T.35 prefix: '{}'", prefix.toString());
 
     // Add sample entry with me4c namespace
     // For me4c namespace, desired_local_key_id must match the 4CC in key_value
