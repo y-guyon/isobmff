@@ -13,20 +13,20 @@ const float  PI_CUSTOM = 3.14159265358979323846;
 const int MAX_NB_ALTERNATE = 4;
 const int MAX_NB_CONTROL_POINTS = 32;
 const int MAX_NB_CHROMATICITIES = 8;
-const int MAX_NB_component_mixing_coefficient = 6;
+const int MAX_NB_COMPONENT_MIXING_COEFFICIENT = 6;
 
 // Compute quantization error of each float to uint16_t
-const float Q_HDR_REFERENCE_WHITE = 50000.0 / 10000.0;
-const float Q_HDR_HEADROOM   = 60000.0 / 6.0;
-const float P_GAIN_APPLICATION_SPACE_CHROMATICITY = 3.0 / 30000.0 / 2.0;
-const float Q_GAIN_APPLICATION_SPACE_CHROMATICITY = 30000.0 / 3.0; 
-const float P_COMPONENT_MIXING_COEFFICIENT = 1.0 / 10000.0 / 2.0;
-const float Q_COMPONENT_MIXING_COEFFICIENT = 10000.0; 
-const float Q_GAIN_CURVE_CONTROL_POINT_X = 64000.0 / 64.0;
-const float Q_GAIN_CURVE_CONTROL_POINT_Y = 60000.0 / 6.0;
-const float O_GAIN_CURVE_CONTROL_POINT_THETA = 90.0;
-const float Q_GAIN_CURVE_CONTROL_POINT_THETA = 36000.0 / 180.0; 
-
+const float Q_HDR_REFERENCE_WHITE = 5.0f; // Scaling 0.2 to 10000.0 range to 1-50000 (sampling of 0.2)
+const float Q_HDR_HEADROOM   = 10000.0f; // Scaling 0.0 to +6.0 range to 0-60000 (sampling of 0.00001)
+const float P_HDR_HEADROOM   = 0.5f / Q_HDR_HEADROOM; // Scaling 0.0 to +6.0 range to 0-60000 (sampling of 0.00001)
+const float Q_GAIN_APPLICATION_SPACE_CHROMATICITY = 50000.0f; // Scaling 0.0 to +1.0 range to 0-50000 (sampling of 0.00002)
+const float P_GAIN_APPLICATION_SPACE_CHROMATICITY = 0.5f /Q_GAIN_APPLICATION_SPACE_CHROMATICITY;  // Maximum quantization error of chromaticity
+const float Q_COMPONENT_MIXING_COEFFICIENT = 50000.0f; // Scaling 0.0 to +1.0 range to 0-50000 (sampling of 0.00002)
+const float P_COMPONENT_MIXING_COEFFICIENT = 0.5f / Q_COMPONENT_MIXING_COEFFICIENT; // Maximum quantization error of component mixing coefficient
+const float Q_GAIN_CURVE_CONTROL_POINT_X = 1000.0f; // Scaling 0.0 to +64.0 range to 0-64000 (sampling of 0.0001)
+const float Q_GAIN_CURVE_CONTROL_POINT_Y = 10000.0f; // Scaling 0.0 to +6.0 range to 0-60000 (sampling of 0.00001)
+const float O_GAIN_CURVE_CONTROL_POINT_THETA = 90.0f; // Offset  to bring -90.0 to +90.0 range to 0-180
+const float Q_GAIN_CURVE_CONTROL_POINT_THETA = 200.0f; // Scaling -90.0 to +90.0 range to 0-36000 (sampling of 0.005)
 
 struct BinaryData{
     std::vector<uint8_t> payload;
@@ -104,8 +104,8 @@ struct SyntaxElements {
   
     // smpte_st_2094_50_component_mixing
     uint16_t  component_mixing_type[MAX_NB_ALTERNATE];
-    bool has_component_mixing_coefficient_flag[MAX_NB_ALTERNATE][MAX_NB_component_mixing_coefficient];
-    uint16_t  component_mixing_coefficient[MAX_NB_ALTERNATE][MAX_NB_component_mixing_coefficient];
+    bool has_component_mixing_coefficient_flag[MAX_NB_ALTERNATE][MAX_NB_COMPONENT_MIXING_COEFFICIENT];
+    uint16_t  component_mixing_coefficient[MAX_NB_ALTERNATE][MAX_NB_COMPONENT_MIXING_COEFFICIENT];
   
     // smpte_st_2094_50_gain_curve
     uint16_t  gain_curve_num_control_points_minus_1[MAX_NB_ALTERNATE];
@@ -138,7 +138,7 @@ public:
     void                    setVerboseLevel(int level);
 
 
-    void dbgPrintMetadataItems(bool decode);
+    void dbgPrintMetadataItems();
     // Carrying mechanism information
     std::string keyValue;
     BinaryData payloadBinaryData;

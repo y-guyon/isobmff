@@ -103,7 +103,7 @@ MetadataMap parseMetadataFolder(const std::string& metadataFolder, int logLevel)
       st2094_50.setVerboseLevel(logLevel);
 
       error_raised = st2094_50.decodeJsonToMetadataItems(j); // decode the json to metadata items
-      st2094_50.dbgPrintMetadataItems(false);  // print up to what was decoded from the json
+      st2094_50.dbgPrintMetadataItems();  // print up to what was decoded from the json
       if (error_raised) {
         std::cerr << "ERROR: Skipping " << path << " due to JSON decoding errors.\n";
         std::cerr << "       Please verify the JSON schema matches the expected format.\n";
@@ -166,7 +166,7 @@ void decodeBinaryData(const std::string& inputFile, int logLevel) {
   st2094_50.decodeBinaryToSyntaxElements(binary_data);
   st2094_50.convertSyntaxElementsToMetadataItems();
   // [Todo: set timing metadata]
-  st2094_50.dbgPrintMetadataItems(true);  // Print decoded metadata from bitstream
+  st2094_50.dbgPrintMetadataItems();  // Print decoded metadata from bitstream
 
 
   // Write decoded metadata items to a json file

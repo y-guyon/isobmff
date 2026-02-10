@@ -282,7 +282,7 @@ MP4Err MebxIt35Extractor::extract(const ExtractionConfig& config, MetadataMap* o
             SMPTE_ST2094_50 st2094_50;
             st2094_50.decodeBinaryToSyntaxElements(payload);
             st2094_50.convertSyntaxElementsToMetadataItems();
-            st2094_50.dbgPrintMetadataItems(true);
+            st2094_50.dbgPrintMetadataItems();
         }
 
         LOG_INFO("Extracted sample {}: {} bytes, DTS={}, duration={} (frame {})",

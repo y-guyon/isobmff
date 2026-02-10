@@ -204,7 +204,7 @@ MP4Err SampleGroupExtractor::extract(const ExtractionConfig& config, MetadataMap
             SMPTE_ST2094_50 st2094_50;
             st2094_50.decodeBinaryToSyntaxElements(payload);
             st2094_50.convertSyntaxElementsToMetadataItems();
-            st2094_50.dbgPrintMetadataItems(true);
+            st2094_50.dbgPrintMetadataItems();
         }
 
         LOG_INFO("Extracted group {}: {} bytes (complete_message={})",

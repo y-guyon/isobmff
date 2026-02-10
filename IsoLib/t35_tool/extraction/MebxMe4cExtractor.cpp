@@ -413,7 +413,7 @@ MP4Err MebxMe4cExtractor::extract(const ExtractionConfig& config, MetadataMap* o
             
             st2094_50.decodeBinaryToSyntaxElements(binaryData);
             st2094_50.convertSyntaxElementsToMetadataItems();
-            st2094_50.dbgPrintMetadataItems(true);  // Print decoded metadata from bitstream
+            st2094_50.dbgPrintMetadataItems();  // Print decoded metadata from bitstream
         }
 
         LOG_INFO("Extracted sample {}: {} bytes, DTS={}, duration={} (frame {})",
