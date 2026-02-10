@@ -53,7 +53,7 @@ cmake ..
 make
 ```
 
-The compiled binary will be available as `t35_tool` (or `t35_tool_v2`).
+The compiled binary will be available as `t35_tool`.
 
 ## Usage
 
@@ -357,8 +357,8 @@ Log messages include:
 ### Project Structure
 
 ```
-t35_tool_v2/
-├── t35_tool_v2.cpp          # Main entry point
+t35_tool/
+├── t35_tool.cpp             # Main entry point
 ├── common/
 │   ├── Logger.hpp           # Logging utilities
 │   ├── MetadataTypes.hpp    # Core data types

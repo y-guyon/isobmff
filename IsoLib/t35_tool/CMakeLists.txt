@@ -58,27 +58,10 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(spdlog)
 
-# ---- Old t35_tool (keep for reference) ----
-add_executable(
-  t35_tool_legacy
-  t35_tool.cpp
-  sources/SMPTE_ST2094_50.hpp
-  sources/SMPTE_ST2094_50.cpp
-)
-
-# Link libraries
-target_link_libraries(
-  t35_tool_legacy
-  PRIVATE
-    libisomediafile
-    nlohmann_json::nlohmann_json
-    CLI11::CLI11
-)
-
-# ---- New t35_tool (functional with stubs) ----
+# ---- t35_tool ----
 add_executable(
   t35_tool
-  t35_tool_v2.cpp
+  t35_tool.cpp
   sources/SMPTE_ST2094_50.cpp
   common/MetadataTypes.cpp
   common/T35Prefix.cpp
