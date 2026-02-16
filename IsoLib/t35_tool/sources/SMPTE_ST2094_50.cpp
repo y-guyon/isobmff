@@ -737,12 +737,15 @@ if (elm.has_adaptive_tone_map_flag) {
     else{ // No more information need to be signaled when using Reference White Tone Mapping Operator
         push_bits(&payloadBinaryData, 0, 7, "zero_7bits", verboseLevel);
     }
-    // remove the latest elements created but not used
-    payloadBinaryData.payload.pop_back();
 }
-
-logMsg(LOGLEVEL_DEBUG, "End SMPTE_ST2094_50::writeSyntaxElementsToBinaryData, payload size = %d bytes", payloadBinaryData.byteIdx);
-dbgPrintMetadataItems(); // Put here for easy comparison of logs
+// Verify binary is byte complete and popback last added new byte 
+if (payloadBinaryData.bitIdx != 0){
+    logMsg(LOGLEVEL_ERROR, "*Critical* Binary data writing did not finish with a full byte.");
+} else {
+    payloadBinaryData.payload.pop_back();
+    logMsg(LOGLEVEL_DEBUG, "End SMPTE_ST2094_50::writeSyntaxElementsToBinaryData, payload size = %d bytes", payloadBinaryData.byteIdx);
+    dbgPrintMetadataItems(); // Put here for easy comparison of logs
+}
 }
 
 /* *********************************** DECODING SECTION ********************************************************************************************/
