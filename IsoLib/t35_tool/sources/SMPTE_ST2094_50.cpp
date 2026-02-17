@@ -96,6 +96,29 @@ void printDebug(const std::string& varName, uint16_t varValue, uint8_t nbBits, i
 }
 
 
+// Print binary data compatible with external verification tool
+void printBinaryData(std::vector<uint8_t> binary_data, int verboseLevel) {
+    if (verboseLevel < LOGLEVEL_TRACE) {
+        return; // Only print debug info at TRACE level
+    }  
+    
+    std::cout << "Binary data decoded, paste in external tool -> https://ccameron-chromium.github.io/agtm-demo/parse.html" << std::endl;
+    const int bytesPerRow = 16; // Define how many bytes per row you want
+    for (int i = 0; i < int(binary_data.size()); i++) {
+        // Print hexadecimal value with 0x prefix
+        std::cout << "0x" << std::noshowbase << std::hex << static_cast<int>(binary_data[i]) << ", ";
+        // New line after every 'bytesPerRow' bytes
+        if ((i + 1) % bytesPerRow == 0) {
+            std::cout << std::endl;
+        }
+    }
+    // Print a newline if the last row isn't complete
+    if (int(binary_data.size()) % bytesPerRow != 0) {
+        std::cout << std::endl;
+    }
+}
+  
+
 void push_boolean(struct BinaryData *payloadBinaryData, bool boolValue, const std::string& varName, int verboseLevel){
     uint8_t decValue = static_cast<uint8_t>(boolValue) ;
     payloadBinaryData->payload[payloadBinaryData->byteIdx] = payloadBinaryData->payload[payloadBinaryData->byteIdx] + (decValue << (7 - payloadBinaryData->bitIdx));
@@ -716,7 +739,7 @@ if (elm.has_adaptive_tone_map_flag) {
                 }
             }
             /// Write gain curve function parameters
-            if ( iAlt == 0 || elm.has_common_curve_params_flag){
+            if ( iAlt == 0 || !elm.has_common_curve_params_flag){
                 push_bits(&payloadBinaryData,    elm.gain_curve_num_control_points_minus_1[iAlt], 5, "gain_curve_num_control_points_minus_1[iAlt]", verboseLevel);
                 push_boolean(&payloadBinaryData, elm.gain_curve_use_pchip_slope_flag[iAlt]      ,    "gain_curve_use_pchip_slope_flag[iAlt]", verboseLevel); 
                 push_bits(&payloadBinaryData,     0                                             , 2, "zero_2bits[iAlt]", verboseLevel);                
@@ -759,8 +782,8 @@ void SMPTE_ST2094_50::decodeBinaryToSyntaxElements(std::vector<uint8_t> binary_d
   payloadBinaryData.bitIdx  = 0;
   for (int i = 0; i < int(binary_data.size()); i++) {
       payloadBinaryData.payload.push_back(binary_data[i]);
-      printDebug("Byte[" + std::to_string(i) + "]= ", uint16_t(binary_data[i]), 8, verboseLevel);
   }
+  printBinaryData(binary_data,  verboseLevel);
 
   logMsg(LOGLEVEL_DEBUG, "Syntax Elements Decoding");
   elm.application_version = pull_bits(&payloadBinaryData, 3, "application_version", verboseLevel);
