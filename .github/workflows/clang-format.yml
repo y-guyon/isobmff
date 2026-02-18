@@ -7,8 +7,15 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4
-    - name: Run clang-format style check for C/C++ programs.
-      uses: jidicula/clang-format-action@v4.16.0
-      with:
-        clang-format-version: '21'
-        check-path: 'IsoLib/libisomediafile'
+
+    - name: Install clang-format
+      run: |
+        wget https://apt.llvm.org/llvm.sh
+        chmod +x llvm.sh
+        sudo ./llvm.sh 18
+        sudo apt-get install -y clang-format-18
+
+    - name: Run clang-format check
+      run: |
+        find IsoLib/libisomediafile \( -name "*.h" -o -name "*.cpp" -o -name "*.c" \) | \
+          xargs clang-format-18 --dry-run --Werror -style=file
