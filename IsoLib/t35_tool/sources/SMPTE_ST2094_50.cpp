@@ -503,7 +503,7 @@ bool SMPTE_ST2094_50::decodeJsonToMetadataItems(nlohmann::json j) {
             // Parse Slope M control points (optional)
             if (gainCurveDict.contains("gainCurveControlPointM")) {
                 hasSlopeParameter[i] = true;
-                if (!parseControlPointArray("gainCurveControlPointM", cgf.gc.gainCurveControlPointTheta)) {
+                if (!parseControlPointArray("gainCurveControlPointM", cgf.gc.gainCurveControlPointM)) {
                     logMsg(LOGLEVEL_WARNING, "Failed to parse gainCurveControlPointM for ColorGainFunction[%u], continuing without it", i);
                     hasSlopeParameter[i] = false;
                 }
@@ -671,7 +671,8 @@ void SMPTE_ST2094_50::convertMetadataItemsToSyntaxElements(){
           }
           if (!elm.gain_curve_use_pchip_slope_flag[iAlt]) {
               for (uint16_t iCps = 0; iCps < cvt.hatm.cgf[iAlt].gc.gainCurveNumControlPoints; iCps++) {
-                  elm.gain_curve_control_points_theta[iAlt][iCps] = uint16_t((cvt.hatm.cgf[iAlt].gc.gainCurveControlPointTheta[iCps] + O_GAIN_CURVE_CONTROL_POINT_THETA) * Q_GAIN_CURVE_CONTROL_POINT_THETA  + 0.5f);
+                float theta = atan(cvt.hatm.cgf[iAlt].gc.gainCurveControlPointM[iCps]) * 180.0f / M_PI;
+                elm.gain_curve_control_points_theta[iAlt][iCps] = uint16_t(( theta + O_GAIN_CURVE_CONTROL_POINT_THETA) * Q_GAIN_CURVE_CONTROL_POINT_THETA  + 0.5f);
               }
           }
       }
@@ -927,7 +928,7 @@ void SMPTE_ST2094_50::convertSyntaxElementsToMetadataItems(){
         // Inner vector for push_back
         std::vector<float> inner_gainCurveControlPointX;
         std::vector<float> inner_gainCurveControlPointY;
-        std::vector<float> inner_gainCurveControlPointTheta;
+        std::vector<float> inner_gainCurveControlPointM;
   
         // Compute the control points parameter depending on the alternate headroom
         float  y_white = 1.0;
@@ -956,7 +957,7 @@ void SMPTE_ST2094_50::convertSyntaxElementsToMetadataItems(){
           float slope = atan( (x * m - y) / (log(2) * x * y) );
           cgf.gc.gainCurveControlPointX.push_back(x);
           cgf.gc.gainCurveControlPointY.push_back(log2(y / x));
-          cgf.gc.gainCurveControlPointTheta.push_back(slope / PI_CUSTOM * 180.0);
+          cgf.gc.gainCurveControlPointM.push_back(slope / PI_CUSTOM * 180.0);
         }
         cvt.hatm.cgf.push_back(cgf);
       }
@@ -1060,7 +1061,8 @@ void SMPTE_ST2094_50::convertSyntaxElementsToMetadataItems(){
           cgf.gc.gainCurveControlPointY.push_back(sign * float(elm.gain_curve_control_points_y[iAlt][iCps]) / Q_GAIN_CURVE_CONTROL_POINT_Y);
           if (!elm.gain_curve_use_pchip_slope_flag[iAlt]) {
             hasSlopeParameter[iAlt]     = true;
-            cgf.gc.gainCurveControlPointTheta.push_back(float(elm.gain_curve_control_points_theta[iAlt][iCps]) / Q_GAIN_CURVE_CONTROL_POINT_THETA - O_GAIN_CURVE_CONTROL_POINT_THETA);
+            float theta = float(elm.gain_curve_control_points_theta[iAlt][iCps]) / Q_GAIN_CURVE_CONTROL_POINT_THETA - O_GAIN_CURVE_CONTROL_POINT_THETA;
+            cgf.gc.gainCurveControlPointM.push_back( tan(theta * M_PI / 180.0f) );
           }
         }
         cvt.hatm.cgf.push_back(cgf);
@@ -1113,8 +1115,8 @@ nlohmann::json SMPTE_ST2094_50::encodeMetadataItemsToJson() {
             gainCurveControlPointX.push_back(cvt.hatm.cgf[i].gc.gainCurveControlPointX[p]);
             gainCurveControlPointY.push_back(cvt.hatm.cgf[i].gc.gainCurveControlPointY[p]);
           }
-          for (size_t p = 0; p < cvt.hatm.cgf[i].gc.gainCurveControlPointTheta.size(); p++){
-            gainCurveControlPointT.push_back(cvt.hatm.cgf[i].gc.gainCurveControlPointTheta[p]);
+          for (size_t p = 0; p < cvt.hatm.cgf[i].gc.gainCurveControlPointM.size(); p++){
+            gainCurveControlPointT.push_back(cvt.hatm.cgf[i].gc.gainCurveControlPointM[p]);
           }
           gainCurveControlPointX_ptr.push_back(gainCurveControlPointX);
           gainCurveControlPointY_ptr.push_back(gainCurveControlPointY);
@@ -1185,8 +1187,8 @@ void SMPTE_ST2094_50::dbgPrintMetadataItems() {
               }
               std::cout << "]" << std::endl;
               
-              std::cout << "gainCurveControlPointTheta=[" << std::endl;
-              for (float val : cvt.hatm.cgf[iAlt].gc.gainCurveControlPointTheta) {
+              std::cout << "gainCurveControlPointM=[" << std::endl;
+              for (float val : cvt.hatm.cgf[iAlt].gc.gainCurveControlPointM) {
                   std::cout << val << ", ";
               }
               std::cout << "]" << std::endl;

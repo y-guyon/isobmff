@@ -39,7 +39,7 @@ struct GainCurve{
   uint32_t gainCurveNumControlPoints;
   std::vector<float> gainCurveControlPointX;
   std::vector<float> gainCurveControlPointY;
-  std::vector<float> gainCurveControlPointTheta;
+  std::vector<float> gainCurveControlPointM;
 };
 
 struct ComponentMix{
