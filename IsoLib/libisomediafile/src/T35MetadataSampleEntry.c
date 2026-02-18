@@ -159,7 +159,7 @@ static MP4Err createFromInputStream(MP4AtomPtr s, MP4AtomPtr proto, MP4InputStre
       TESTMALLOC(self->t35_identifier);
       err = inputStream->readData(inputStream, bytesToRead, (char *)self->t35_identifier, NULL);
       if(err) goto bail;
-      self->bytesRead += bytesToRead;
+      self->bytesRead += (u32)bytesToRead;
     }
   }
 
