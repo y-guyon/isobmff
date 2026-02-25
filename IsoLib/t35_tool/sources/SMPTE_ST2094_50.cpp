@@ -60,6 +60,9 @@ void printDebug(const std::string& varName, uint16_t varValue, uint8_t nbBits, i
     return; // Only print debug info at TRACE level
   }
   
+  // Explicitly set decimal output format
+  std::cout << std::dec;
+  
   std::cout.width(50); std::cout << varName << "=";
   std::cout.width(6); std::cout  << varValue << " | ";
   switch (nbBits) { // bitset need constant
@@ -88,7 +91,7 @@ void printDebug(const std::string& varName, uint16_t varValue, uint8_t nbBits, i
       std::cout.width(16); std::cout <<  std::bitset<8>(varValue).to_string() << "\n";
       break;
     case 16:
-      std::cout.width(16); std::cout <<  std::bitset<16>(varValue).to_string() << "\n";
+      std::cout.width(16); std::cout << std::bitset<16>(varValue).to_string() << "\n";
       break;
   default:
       break;
@@ -845,7 +848,7 @@ void SMPTE_ST2094_50::decodeBinaryToSyntaxElements(std::vector<uint8_t> binary_d
             }
 
             // Read gain curve function parameters - table C.5
-            if ( iAlt == 0 || elm.has_common_curve_params_flag){
+            if ( iAlt == 0 || !elm.has_common_curve_params_flag){
               elm.gain_curve_num_control_points_minus_1[iAlt] = pull_bits(&payloadBinaryData, 5, "gain_curve_num_control_points_minus_1[iAlt]", verboseLevel);
                 elm.gain_curve_use_pchip_slope_flag[iAlt] = pull_boolean(&payloadBinaryData, "gain_curve_use_pchip_slope_flag[iAlt]", verboseLevel);
                 pull_bits(&payloadBinaryData, 2, "zero_2bits[iAlt]", verboseLevel);           
