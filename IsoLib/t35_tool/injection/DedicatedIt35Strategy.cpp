@@ -312,6 +312,14 @@ MP4Err DedicatedIt35Strategy::inject(const InjectionConfig& config,
     }
 
     LOG_INFO("Added {} metadata samples to dedicated IT35 track", sampleCount);
+
+    // Finalize media edits to commit durations
+    err = MP4EndMediaEdits(mediaM);
+    if (err) {
+        LOG_ERROR("Failed to end media edits (err={})", err);
+        goto bail;
+    }
+
     LOG_INFO("Metadata injection complete");
 
 bail:
