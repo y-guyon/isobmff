@@ -648,10 +648,10 @@ void SMPTE_ST2094_50::convertMetadataItemsToSyntaxElements(){
                   }
                   sumCoefficients = sumCoefficients + elm.component_mixing_coefficient[iAlt][iCmf];
               }
-              if (sumCoefficients != 60000) { logMsg(LOGLEVEL_ERROR, "sum component mixing coefficient for alternate %d is not equal to 1.0", iAlt); }
+              if (sumCoefficients != Q_COMPONENT_MIXING_COEFFICIENT) { logMsg(LOGLEVEL_WARNING, "Sum component mixing coefficient for alternate %d is not equal to 1.0, they will be scaled to 1.0 at decoding", iAlt); }
           }
           if (elm.component_mixing_type[0] != elm.component_mixing_type[iAlt]) {
-            elm.has_common_curve_params_flag = false;
+            elm.component_mixing_type = false;
           }
 
           // Create syntax elements for the gain curve function
@@ -1034,10 +1034,18 @@ void SMPTE_ST2094_50::convertSyntaxElementsToMetadataItems(){
             cgf.cm.componentMixGreen = 1.0f / 6.0f; 
             cgf.cm.componentMixBlue = 1.0f / 6.0f;}
           else if (elm.component_mixing_type[iAlt] == 3) {
+              // Compute sum of component
+              float sumComponent = 0.0f;
+              for (int k = 0; k < MAX_NB_COMPONENT_MIXING_COEFFICIENT; k++) {
+                sumComponent = float(elm.component_mixing_coefficient[iAlt][k]);
+              }
+              if (sumComponent != Q_COMPONENT_MIXING_COEFFICIENT){
+                logMsg(LOGLEVEL_WARNING, "Sum component mixing coefficient for alternate %d is not equal to 1.0, they will be scaled to 1.0.", iAlt); }
+              }
               for (int k = 0; k < MAX_NB_COMPONENT_MIXING_COEFFICIENT; k++) {
                   float value = 0.0f;
                   if (elm.has_component_mixing_coefficient_flag[iAlt][k]) {
-                      value = float(elm.component_mixing_coefficient[iAlt][k]) / Q_COMPONENT_MIXING_COEFFICIENT;
+                      value = float(elm.component_mixing_coefficient[iAlt][k]) / sumComponent;
                   }
                   switch (k) {
                       case 0: cgf.cm.componentMixRed = value; break;
