@@ -117,12 +117,11 @@ static MP4Err findIt35MetadataTrack(MP4Movie moov,
         {
             filePrefix += ":";
             filePrefix += description;
-            LOG_DEBUG("Found T35 identifier: {} with description: '{}'", hexStr, description);
         }
-        else
-        {
-            LOG_DEBUG("Found T35 identifier: {} (no description)", hexStr);
-        }
+
+        LOG_DEBUG("Parsed 'it35' sample entry: identifier={} ({} bytes), description='{}'",
+                  hexStr, identifierSize,
+                  (description && description[0] != '\0') ? description : "<empty>");
         free(description);
 
         // Parse both prefixes to compare hex part only
@@ -135,7 +134,8 @@ static MP4Err findIt35MetadataTrack(MP4Movie moov,
                       filePrefixParsed.hex(), requestedPrefix.hex());
             continue;
         }
-        LOG_DEBUG("T35 hex matches requested hex");
+        LOG_DEBUG("T35 hex '{}' matches requested hex '{}'",
+                  filePrefixParsed.hex(), requestedPrefix.hex());
 
         if(!requestedPrefix.description().empty() && !filePrefixParsed.description().empty() &&
            requestedPrefix.description() != filePrefixParsed.description())
