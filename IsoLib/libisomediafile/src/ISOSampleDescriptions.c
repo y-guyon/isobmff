@@ -2606,3 +2606,41 @@ bail:
   TEST_RETURN(err);
   return err;
 }
+
+ISO_EXTERN(ISOErr)
+ISOGetT35SampleEntryFields(MP4Handle sampleEntryH, u8 **outIdentifier, u32 *outIdentifierSize,
+                           char **outDescription)
+{
+  MP4Err err;
+  MP4T35MetadataSampleEntryPtr it35 = NULL;
+
+  if(sampleEntryH == NULL || outIdentifier == NULL || outIdentifierSize == NULL)
+    BAILWITHERROR(MP4BadParamErr);
+
+  *outIdentifier     = NULL;
+  *outIdentifierSize = 0;
+  if(outDescription) *outDescription = NULL;
+
+  err = sampleEntryHToAtomPtr(sampleEntryH, (MP4AtomPtr *)&it35, MP4T35MetadataSampleEntryType);
+  if(err) goto bail;
+
+  if(it35->t35_identifier == NULL || it35->t35_identifier_size == 0) BAILWITHERROR(MP4NotFoundErr);
+
+  *outIdentifier = (u8 *)calloc(it35->t35_identifier_size, 1);
+  TESTMALLOC(*outIdentifier);
+  memcpy(*outIdentifier, it35->t35_identifier, it35->t35_identifier_size);
+  *outIdentifierSize = it35->t35_identifier_size;
+
+  if(outDescription && it35->description && it35->description[0] != '\0')
+  {
+    u32 len         = (u32)strlen(it35->description) + 1;
+    *outDescription = (char *)calloc(len, 1);
+    TESTMALLOC(*outDescription);
+    memcpy(*outDescription, it35->description, len);
+  }
+
+bail:
+  if(it35) it35->destroy((MP4AtomPtr)it35);
+  TEST_RETURN(err);
+  return err;
+}

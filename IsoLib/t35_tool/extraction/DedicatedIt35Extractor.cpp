@@ -6,6 +6,7 @@
 extern "C" {
     #include "MP4Movies.h"
     #include "MP4Atoms.h"
+    #include "ISOMovies.h"
 }
 
 #include <filesystem>
@@ -81,54 +82,67 @@ static MP4Err findIt35MetadataTrack(MP4Movie moov,
 
         LOG_INFO("Found IT35 track with ID {}", trackID);
 
-        // Get T35MetadataSampleEntry to read description and t35_identifier
-        MP4T35MetadataSampleEntryPtr it35Entry = (MP4T35MetadataSampleEntryPtr)(*sampleEntryH);
+        // Read t35_identifier and description from the serialized sample entry handle
+        u8  *identifier     = nullptr;
+        u32  identifierSize = 0;
+        char *description   = nullptr;
 
-        if (it35Entry && it35Entry->t35_identifier && it35Entry->t35_identifier_size > 0) {
-            // Convert t35_identifier bytes to hex string
-            std::string hexStr;
-            hexStr.reserve(it35Entry->t35_identifier_size * 2);
-            for (u32 i = 0; i < it35Entry->t35_identifier_size; i++) {
-                char buf[3];
-                snprintf(buf, sizeof(buf), "%02X", it35Entry->t35_identifier[i]);
-                hexStr += buf;
-            }
+        MP4Err readErr = ISOGetT35SampleEntryFields(sampleEntryH, &identifier, &identifierSize,
+                                                    &description);
+        MP4DisposeHandle(sampleEntryH);
+        sampleEntryH = nullptr;
 
-            // Build prefix string: "HEX:Description"
-            std::string filePrefix = hexStr;
-            if (it35Entry->description && it35Entry->description[0] != '\0') {
-                filePrefix += ":";
-                filePrefix += it35Entry->description;
-                LOG_DEBUG("Found T35 identifier: {} with description: '{}'", hexStr, it35Entry->description);
-            } else {
-                LOG_DEBUG("Found T35 identifier: {} (no description)", hexStr);
-            }
-
-            // Parse both prefixes to compare hex part only
-            T35Prefix requestedPrefix(t35PrefixStr);
-            T35Prefix filePrefixParsed(filePrefix);
-
-            // Verify hex prefix matches (ignore description)
-            if (requestedPrefix.hex() != filePrefixParsed.hex()) {
-                LOG_DEBUG("T35 hex '{}' does not match requested hex '{}'",
-                         filePrefixParsed.hex(), requestedPrefix.hex());
-                MP4DisposeHandle(sampleEntryH);
-                continue;  // Try next track
-            }
-            LOG_DEBUG("T35 hex matches requested hex");
-
-            // Warn if descriptions differ (informative only)
-            if (!requestedPrefix.description().empty() &&
-                !filePrefixParsed.description().empty() &&
-                requestedPrefix.description() != filePrefixParsed.description()) {
-                LOG_WARN("T.35 description mismatch: requested '{}' but file has '{}'",
-                        requestedPrefix.description(), filePrefixParsed.description());
-            }
-        } else {
+        if(readErr || identifier == nullptr || identifierSize == 0)
+        {
             LOG_WARN("Could not read t35_identifier from IT35 sample entry");
+            free(identifier);
+            free(description);
+            continue;
         }
 
-        MP4DisposeHandle(sampleEntryH);
+        // Convert t35_identifier bytes to hex string
+        std::string hexStr;
+        hexStr.reserve(identifierSize * 2);
+        for(u32 j = 0; j < identifierSize; j++)
+        {
+            char buf[3];
+            snprintf(buf, sizeof(buf), "%02X", identifier[j]);
+            hexStr += buf;
+        }
+        free(identifier);
+
+        // Build prefix string: "HEX:Description"
+        std::string filePrefix = hexStr;
+        if(description && description[0] != '\0')
+        {
+            filePrefix += ":";
+            filePrefix += description;
+            LOG_DEBUG("Found T35 identifier: {} with description: '{}'", hexStr, description);
+        }
+        else
+        {
+            LOG_DEBUG("Found T35 identifier: {} (no description)", hexStr);
+        }
+        free(description);
+
+        // Parse both prefixes to compare hex part only
+        T35Prefix requestedPrefix(t35PrefixStr);
+        T35Prefix filePrefixParsed(filePrefix);
+
+        if(requestedPrefix.hex() != filePrefixParsed.hex())
+        {
+            LOG_DEBUG("T35 hex '{}' does not match requested hex '{}'",
+                      filePrefixParsed.hex(), requestedPrefix.hex());
+            continue;
+        }
+        LOG_DEBUG("T35 hex matches requested hex");
+
+        if(!requestedPrefix.description().empty() && !filePrefixParsed.description().empty() &&
+           requestedPrefix.description() != filePrefixParsed.description())
+        {
+            LOG_WARN("T.35 description mismatch: requested '{}' but file has '{}'",
+                     requestedPrefix.description(), filePrefixParsed.description());
+        }
 
         // Check for 'rndr' track reference
         MP4Track videoTrack = nullptr;

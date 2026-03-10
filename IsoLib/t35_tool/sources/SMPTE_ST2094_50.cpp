@@ -651,7 +651,7 @@ void SMPTE_ST2094_50::convertMetadataItemsToSyntaxElements(){
               if (sumCoefficients != Q_COMPONENT_MIXING_COEFFICIENT) { logMsg(LOGLEVEL_WARNING, "Sum component mixing coefficient for alternate %d is not equal to 1.0, they will be scaled to 1.0 at decoding", iAlt); }
           }
           if (elm.component_mixing_type[0] != elm.component_mixing_type[iAlt]) {
-            elm.component_mixing_type = false;
+            elm.has_common_component_mix_params_flag = false;
           }
 
           // Create syntax elements for the gain curve function
@@ -1041,7 +1041,6 @@ void SMPTE_ST2094_50::convertSyntaxElementsToMetadataItems(){
               }
               if (sumComponent != Q_COMPONENT_MIXING_COEFFICIENT){
                 logMsg(LOGLEVEL_WARNING, "Sum component mixing coefficient for alternate %d is not equal to 1.0, they will be scaled to 1.0.", iAlt); }
-              }
               for (int k = 0; k < MAX_NB_COMPONENT_MIXING_COEFFICIENT; k++) {
                   float value = 0.0f;
                   if (elm.has_component_mixing_coefficient_flag[iAlt][k]) {

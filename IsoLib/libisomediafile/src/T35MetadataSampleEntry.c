@@ -109,7 +109,7 @@ static MP4Err createFromInputStream(MP4AtomPtr s, MP4AtomPtr proto, MP4InputStre
   MP4Err err;
   MP4T35MetadataSampleEntryPtr self = (MP4T35MetadataSampleEntryPtr)s;
   s64 bytesToRead;
-  u32 descLen;
+  u8 *buf = NULL;
   u32 i;
 
   if(self == NULL) BAILWITHERROR(MP4BadParamErr)
@@ -119,53 +119,64 @@ static MP4Err createFromInputStream(MP4AtomPtr s, MP4AtomPtr proto, MP4InputStre
   GETBYTES(6, reserved);
   GET16(dataReferenceIndex);
 
-  /* Calculate remaining bytes to read */
+  /* Read all remaining bytes into a flat buffer, then split on the first null byte.
+   * Scanning byte-by-byte and "rewinding" by adjusting only bytesRead (while leaving
+   * the stream cursor in place) does not work — readData always reads from the current
+   * stream position. */
   bytesToRead = (s64)(self->size - self->bytesRead);
   if(bytesToRead < 0) BAILWITHERROR(MP4BadDataErr);
 
   if(bytesToRead > 0)
   {
-    /* Read description (null-terminated UTF-8 string) */
-    /* First, scan for null terminator to find description length */
-    descLen = 0;
+    buf = (u8 *)calloc((u32)bytesToRead, 1);
+    TESTMALLOC(buf);
+    err = inputStream->readData(inputStream, (u32)bytesToRead, (char *)buf, NULL);
+    if(err) goto bail;
+    self->bytesRead += (u32)bytesToRead;
+
+    /* Find the null terminator that ends the description field */
+    u32 nullPos = (u32)bytesToRead; /* default: no null found */
     for(i = 0; i < (u32)bytesToRead; i++)
     {
-      u8 byte;
-      err = inputStream->read8(inputStream, (u32 *)&byte, NULL);
-      if(err) goto bail;
-      descLen++;
-      self->bytesRead++;
-      if(byte == 0) break;
+      if(buf[i] == 0)
+      {
+        nullPos = i;
+        break;
+      }
     }
 
-    /* Allocate and read description - we need to re-read the bytes */
-    /* Rewind by backing up bytesRead */
-    self->bytesRead -= descLen;
-
+    /* Description: bytes [0 .. nullPos] (including the null terminator) */
+    u32 descLen = nullPos + 1; /* length including null */
     self->description = (char *)calloc(descLen, 1);
     TESTMALLOC(self->description);
-    err = inputStream->readData(inputStream, descLen, (char *)self->description, NULL);
-    if(err) goto bail;
-    self->bytesRead += descLen;
+    memcpy(self->description, buf, descLen);
 
-    /* Recalculate bytes remaining */
-    bytesToRead = (s64)(self->size - self->bytesRead);
-
-    /* Read t35_identifier (everything remaining) */
-    if(bytesToRead > 0)
+    /* t35_identifier: bytes after the null terminator */
+    /* TODO: the length of t35_identifier is currently inferred as "all bytes remaining in the
+     * box after the description null terminator", which prevents any optional boxes (e.g.
+     * BitRateBox) from following it and makes the format non-extensible.
+     * This must be resolved at the next MPEG meeting, either by:
+     *   (a) preceding t35_identifier with an explicit length field (e.g. unsigned int(8)), or
+     *   (b) wrapping description and t35_identifier in their own child boxes (e.g. 'hrsd' for
+     *       the human-readable description as already proposed in the amendment text).
+     * Until then, optional boxes MUST NOT be appended after t35_identifier. */
+    u32 identStart = descLen;
+    if(identStart < (u32)bytesToRead)
     {
-      self->t35_identifier_size = (u32)bytesToRead;
-      self->t35_identifier      = (u8 *)calloc(bytesToRead, 1);
+      self->t35_identifier_size = (u32)bytesToRead - identStart;
+      self->t35_identifier      = (u8 *)calloc(self->t35_identifier_size, 1);
       TESTMALLOC(self->t35_identifier);
-      err = inputStream->readData(inputStream, bytesToRead, (char *)self->t35_identifier, NULL);
-      if(err) goto bail;
-      self->bytesRead += (u32)bytesToRead;
+      memcpy(self->t35_identifier, buf + identStart, self->t35_identifier_size);
     }
+
+    free(buf);
+    buf = NULL;
   }
 
   if(self->bytesRead != self->size) BAILWITHERROR(MP4BadDataErr)
 
 bail:
+  free(buf);
   TEST_RETURN(err);
   return err;
 }
